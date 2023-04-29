@@ -1,5 +1,5 @@
 ```sql
-//This example queries the last 30 days of the syslog table, aggregates the number of hits per day, and graphs results to a column chart
+// This example queries the last 30 days of the syslog table, aggregates the number of hits per day, and the graphs results
 
 Syslog                                          // <--Define the table to query
 | where TimeGenerated > ago(30d)                // <--Query the last 30 days into the table
