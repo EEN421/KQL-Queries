@@ -1,0 +1,6 @@
+//Ever wonder which Event IDs bring the most noise?
+
+SecurityEvent                       // <--Define the table to query
+| where TimeGenerated > ago(30d)    // <--Query the last 30 days
+| summarize count() by EventID      // <--Return number of hits per EventID
+| render columnchart                // <--Optional, but helps visualize which EventIDs are the heavy hitters
