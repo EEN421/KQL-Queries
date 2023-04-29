@@ -1,0 +1,8 @@
+//How Many Times Has This Machine Thrown This Event Today?
+
+SecurityEvent                                                                               // <--Define the table to query
+| where EventID == "EventID"                                                                // <--Define the EventID to query for
+| where Computer == "ThisDevice"                                                            // <--Define the scope (which machine)
+| where TimeGenerated >= startofday(ago(1d)) and TimeGenerated <= startofday(now())         // <--Define the time span to query
+| summarize count() by bin(TimeGenerated,1d)                                                // <--Return results by frequency per day
+| render columnchart                                                                        // <--(Optional) Graph results to chart
