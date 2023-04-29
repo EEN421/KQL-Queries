@@ -1,0 +1,3 @@
+SecurityEvent
+| where EventID == "4663"
+| summarize count() by Computer
