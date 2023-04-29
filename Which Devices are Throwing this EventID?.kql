@@ -1,4 +1,4 @@
-// "Ever wonder how many times each computer in your environment throws a specific EventID per day?"
+//Ever wonder how many times each computer in your environment throws a specific EventID per day?
 
 SecurityEvent                     // <--Define the table to query
 | where EventID == "4663"         // <--Declare which EventID you're looking for
