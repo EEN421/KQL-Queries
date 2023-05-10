@@ -1,0 +1,9 @@
+let ingestioncost=5.22; //set for client's LA ingest cost + Sentinel cost
+Heartbeat
+| where OSName contains "Windows 10" or OSName contains "Windows 11"
+| where TimeGenerated >ago(30d)
+| summarize arg_max(TimeGenerated, OSName) by Computer
+| join (SecurityEvent
+| where TimeGenerated >ago(30d)) on Computer
+| summarize GB=sum(_BilledSize)/1000/1000/1000
+| extend cost = GB*ingestioncost
