@@ -1,3 +1,5 @@
+//Return the ingest volume in GB for a given EventID from the SecurityEvent table
+
 SecurityEvent		             		        //<-- Query the SecurityEvent table
 | where TimeGenerated > ago(1h)		            	//<-- Query the last hour
 | where EventID == 8002			                //<-- Query for EventID 8002
