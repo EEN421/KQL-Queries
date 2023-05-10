@@ -1,0 +1,3 @@
+SecurityEvent                                   //<-- Query the SecurityEvent table
+| where TimeGenerated > ago(1d)                 //<-- Query the last day
+| summarize GB=sum(_BilledSize)/1000/1000/1000  //<-- Organize results by GB
