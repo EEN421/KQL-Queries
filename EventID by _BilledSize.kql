@@ -7,4 +7,4 @@ SecurityEvent		             		        //<-- Query the SecurityEvent table
 
 //You can change the last line in the above query to the following if you’re a stickler for Gibibytes versus Gigabytes: 
 
-//| summarize GB=sum(_BilledSize)/1024/1024/1024	
+| summarize GB=sum(_BilledSize)/1024/1024/1024	
