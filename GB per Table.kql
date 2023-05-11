@@ -1,4 +1,5 @@
-//Return the ingest volume in GB for a table:
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley
+// This query returns the ingest volume in GB for a table
 
 SecurityEvent                                   //<-- Query the SecurityEvent table
 | where TimeGenerated > ago(1d)                 //<-- Query the last day
