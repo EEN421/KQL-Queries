@@ -1,3 +1,4 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley
 //Ever wonder how many times each computer in your environment throws a specific EventID per day?
 
 SecurityEvent                     // <--Define the table to query
