@@ -2,7 +2,7 @@
 // This is great for checking out your billable ingest patterns over the past quarter for QBRs etc. 
 // If you see some wild highs and lows and need help making sense of the results, check out my KQL Detective series at hanley.cloud
 
-Usage                                                                               // <--Query the ***Usage*** table
+Usage                                                                               // <--Query the Usage table
 | where TimeGenerated > ago(90d)                                                    // <--Query the last 90 days
 | where IsBillable == true                                                          // <--Only include 'billable' date
 | summarize TotalVolumeGB = sum(Quantity) / 1000 by bin(StartTime, 1d), Solution    // <--Chop it up into GB / Day
