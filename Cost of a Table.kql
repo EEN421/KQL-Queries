@@ -1,4 +1,4 @@
-// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
 // This query will tell you how much a given table will cost you
 // For this query, the 'rate' acts like a global floating point variable which is manually defined.
 // The rate for your region can be found here: https://azure.microsoft.com/en-us/pricing/details/microsoft-sentinel/
