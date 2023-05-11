@@ -1,5 +1,5 @@
 // This query will tell you how much a given table will cost you
-// For this query, the 'rate' acts like a global variable which is manually defined.
+// For this query, the 'rate' acts like a global floating point variable which is manually defined.
 // Go here for effective cost per GB based on your region: https://azure.microsoft.com/en-us/pricing/details/microsoft-sentinel/
 // You can calculate the LAW cost, Sentinel cost, or both (effective cost per GB) by setting the ingestioncost variable
 // This doesn't have to be over 30 days, you can adjust the TimeGenerated parameter to a a week (7d), a day (1d), or even hourly (1h) etc.
