@@ -6,7 +6,7 @@
 
 let rate = 4.30;                                  //<-- Effective per GB Price in EastUS (LAW & Sentinel per GB cost combined)
 SecurityEvent                                     //<-- We're querying the SecurityEvent table in this one
-| where TimeGenerated >ago(30d)                   //<-- Let's look at the past month, which makes sense considering we're concerned about monthly cost
+| where TimeGenerated >ago(30d)                   //<-- Let's look at the past month, which makes sense considering we're billed monthly
 | summarize GB=sum(_BilledSize)/1000/1000/1000    //<-- Summarize billable volume in GB using the _BilledSize table column
 | extend cost = GB*rate                           //<-- Multiply total GBs for the month by the effective rate (defined in first line of query)
 
