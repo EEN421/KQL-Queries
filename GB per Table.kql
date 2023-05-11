@@ -1,4 +1,4 @@
-// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
 // This query returns the ingest volume in GB for a table
 
 SecurityEvent                                   //<-- Query the SecurityEvent table
