@@ -1,4 +1,4 @@
-// Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
 // Ever wonder which Event IDs bring the most noise?
 
 SecurityEvent                       // <--Define the table to query
