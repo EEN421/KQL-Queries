@@ -1,0 +1,15 @@
+// This query will tell you how much any EventID is costing you over a given time
+// For this query, the 'rate' acts like a global floating point variable which is manually defined
+// You can calculate the LAW cost and Sentinel cost separately, or both (effective cost per GB) by setting the rate variable
+// The rate for your region can be found here: https://azure.microsoft.com/en-us/pricing/details/microsoft-sentinel/
+// This doesn't have to be over the last hour, you can adjust the TimeGenerated parameter to a week (7d), a day (1d), or even a month (30d) etc.
+
+let rate = 4.30;
+SecurityEvent		             		        //<-- Query the SecurityEvent table
+| where TimeGenerated > ago(1h)		            	//<-- Query the last hour
+| where EventID == 8002			                //<-- Query for EventID 8002
+| summarize GB=sum(_BilledSize)/1000/1000/1000	        //<-- Summarize billable volume in GB using the _BilledSize table column
+| extend cost = GB*rate                           //<-- Multiply total GBs for the month by the effective rate (defined in first line of query)
+
+//You can change the last line in the above query to the following if you’re a stickler for Gibibytes versus Gigabytes: 
+| summarize GB=sum(_BilledSize)/1024/1024/1024	
