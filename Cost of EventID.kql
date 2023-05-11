@@ -1,3 +1,4 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley
 // This query will tell you how much any EventID is costing you over a given time
 // For this query, the 'rate' acts like a global floating point variable which is manually defined
 // You can calculate the LAW cost and Sentinel cost separately, or both (effective cost per GB) by setting the rate variable
