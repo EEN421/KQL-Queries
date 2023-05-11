@@ -5,7 +5,7 @@
 // The rate for your region can be found here: https://azure.microsoft.com/en-us/pricing/details/microsoft-sentinel/
 // This doesn't have to be over the last hour, you can adjust the TimeGenerated parameter to a week (7d), a day (1d), or even a month (30d) etc.
 
-let rate = 4.30;                                         //<-- Effective Cost per GB
+let rate = 4.30;                                        //<-- Effective Cost per GB
 SecurityEvent		             		        //<-- Query the SecurityEvent table
 | where TimeGenerated > ago(1h)		            	//<-- Query the last hour
 | where EventID == 8002			                //<-- Query for EventID 8002
