@@ -1,5 +1,5 @@
 // Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley
-//Ever wonder which Event IDs bring the most noise?
+// Ever wonder which Event IDs bring the most noise?
 
 SecurityEvent                       // <--Define the table to query
 | where TimeGenerated > ago(30d)    // <--Query the last 30 days
