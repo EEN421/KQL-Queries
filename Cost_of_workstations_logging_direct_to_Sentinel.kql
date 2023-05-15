@@ -4,7 +4,7 @@
 // Go here for effective cost per GB based on your region: https://azure.microsoft.com/en-us/pricing/details/microsoft-sentinel/
 // You can calculate the LAW cost, Sentinel cost, or both (effective cost per GB) by setting the ingestioncost variable
 
-let rate=5.22; //<-- set for client's LA ingest cost, sentinel ingest cost, or both (effective per GB price listed here:https://azure.microsoft.com/en-us/pricing/details/microsoft-sentinel/) )
+let rate=3.96; //<-- set for client's LA ingest cost, sentinel ingest cost, or both (effective per GB price listed here:https://azure.microsoft.com/en-us/pricing/details/microsoft-sentinel/) )
 Heartbeat
 | where OSName contains "Windows 10" or OSName contains "Windows 11"
 | where TimeGenerated >ago(30d)
