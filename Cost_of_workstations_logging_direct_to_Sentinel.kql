@@ -4,12 +4,12 @@
 // Go here for effective cost per GB based on your region: https://azure.microsoft.com/en-us/pricing/details/microsoft-sentinel/
 // You can calculate the LAW cost, Sentinel cost, or both (effective cost per GB) by setting the ingestioncost variable
 
-let rate=3.96; //<-- set for client's LA ingest cost, sentinel ingest cost, or both (effective per GB price listed here:https://azure.microsoft.com/en-us/pricing/details/microsoft-sentinel/) )
-Heartbeat
-| where OSName contains "Windows 10" or OSName contains "Windows 11"
-| where TimeGenerated >ago(30d)
-| summarize arg_max(TimeGenerated, OSName) by Computer
-| join (SecurityEvent
-| where TimeGenerated >ago(30d)) on Computer
-| summarize GB=sum(_BilledSize)/1000/1000/1000
-| extend cost = GB*rate
+let rate=3.96;                                                                  //<-- Plug in Effective per GB Rate Here)
+Heartbeat                                                                       //<-- Query the Heartbeat table
+| where OSName contains "Windows 10" or OSName contains "Windows 11"            //<-- Query for Win10 and 11 Workstations
+| where TimeGenerated >ago(30d)                                                 //<-- Query the last 30 days
+| summarize arg_max(TimeGenerated, OSName) by Computer                          //<-- Summarize by computer
+| join (SecurityEvent                                                           //<-- Join results with the following query against the SecurityEvent table
+| where TimeGenerated >ago(30d)) on Computer                                    //<-- Query the last 30 days
+| summarize GB=sum(_BilledSize)/1000/1000/1000                                  //<-- Summarize by total _Billed Size and convert to GB
+| extend cost = GB*rate                                                         //<-- Multiply total GB by the effective per GB rate
