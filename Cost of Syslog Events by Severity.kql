@@ -1,0 +1,14 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// Calculate your effective Per GB Price https://azure.microsoft.com/en-ca/pricing/details/microsoft-sentinel/?cdn=disable
+// If your environment has different commitment tiers for your workspace and sentinel instances, follow this guide to calculate your effective Per GB rate: 
+// https://www.hanley.cloud/2023-05-15-Sentinel-Cost-Optimization-Part-2/
+
+let rate = 2.53;  //<-- Effective Cost per GB (500GB / Day Commitment Tier in EastUS)
+Syslog                                            //<-- Query the Syslog table
+| where TimeGenerated > ago(30d)                  //<-- Query the last 30 Days in the table
+| where SeverityLevel == 'info'                   //<-- Query for events of SecurityLevel 'info'
+| summarize GB=sum(_BilledSize)/1000/1000/1000    //<-- Summarize billable volume in GB using the _BilledSize column
+| extend cost = GB*rate                           //<-- Multiple the total GBs by Effective Price per GB
+
+//You can change the last line in the above query to the following if you’re a stickler for Gibibytes versus Gigabytes: 
+| summarize GB=sum(_BilledSize)/1024/1024/1024	
