@@ -3,5 +3,5 @@
 
 SecurityEvent                     // <--Define the table to query
 | where EventID == "4662"         // <--Declare which EventID you're looking for
-| summarize count() by Account   // <--Show how many times that EventID was thrown per account
+| summarize count() by Account    // <--Show how many times that EventID was thrown per account
 | render columnchart              // <--Optional, but helps quickly visualize potential outliers
