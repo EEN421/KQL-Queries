@@ -1,0 +1,6 @@
+search *
+| where TimeGenerated > startofday(ago(30d)) and TimeGenerated < startofday(now())
+| where _IsBillable == True
+| summarize TotalGB = round(sum(_BilledSize/1000/1000/1000)) by bin(TimeGenerated, 1d)
+| summarize avg(TotalGB)
+
