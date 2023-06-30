@@ -1,8 +1,11 @@
-search *
-| where TimeGenerated > startofday(ago(30d)) and TimeGenerated < startofday(now())
-| where _IsBillable == True
-| summarize TotalGB = round(sum(_BilledSize/1000/1000/1000)) by bin(TimeGenerated, 1d)
-| summarize avg(TotalGB)
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// This query doesn't just output the total average across the last 30 days' worth of data, this query breaks the data up into GB per day and takes the average from that. This step is crucial to get the most accurate and meaningful results. 
 
-//You can change the last line in the above query to the following if you’re a stickler for Gibibytes versus Gigabytes: 
+search *                                                                                     //<-- Query Everything
+| where TimeGenerated > startofday(ago(30d)) and TimeGenerated < startofday(now())           //<-- Check the past 30 days
+| where _IsBillable == True                                                                  //<-- Only include billable ingest volume
+| summarize TotalGB = round(sum(_BilledSize/1000/1000/1000)) by bin(TimeGenerated, 1d)       //<-- Summarize billable volume in GB using the _BilledSize table column
+| summarize avg(TotalGB)                                                                     //<-- Summarize and return the daily average
+
+// You can swap the below line into above query if you’re a stickler for Gibibytes versus Gigabytes: 
 | summarize GB=sum(_BilledSize)/1024/1024/1024
