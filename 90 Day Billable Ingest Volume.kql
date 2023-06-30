@@ -4,6 +4,6 @@
 
 Usage                                                                               // <--Query the Usage table
 | where TimeGenerated > ago(90d)                                                    // <--Query the last 90 days
-| where IsBillable == true                                                          // <--Only include 'billable' date
+| where IsBillable == true                                                          // <--Only include 'billable' data
 | summarize TotalVolumeGB = sum(Quantity) / 1000 by bin(StartTime, 1d), Solution    // <--Chop it up into GB / Day
 | render columnchart                                                                // <--Graph the results
