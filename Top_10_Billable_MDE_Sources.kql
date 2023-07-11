@@ -1,0 +1,15 @@
+// This query will break down your top 10 most expensive Microsoft Defender for Endpoint (MDE) log sources in the last 90 days
+// West US 2 Region Effective Cost per GB - https://azure.microsoft.com/en-ca/pricing/details/microsoft-sentinel/?cdn=disable
+
+let cost=4.30; // <-- Set to Effective Cost per GB (URL in comments above)
+search *
+| where TimeGenerated >ago(90d)            //<-- Run this query against the past quarter (90 days)
+| where _IsBillable == True                //<-- Filter out non-billable data
+| where Type contains "Device"             //<-- Apply query to sources with "Device" (Defender Tables) 
+| summarize EventCount=count(), Billable_GB=sum(_BilledSize/1000/1000/1000) by Type 
+| sort by Billable_GB desc                 //<-- Display results in descending order
+| extend Estimated_Cost=Billable_GB*cost   //<-- Create a column (extend) and fill it with results of "Billable_GB x cost" where cost is referenced above
+| limit 10                                 //<-- Limit results to top 10 entries
+
+// You can swap the below line into above query if you’re a stickler for Gibibytes versus Gigabytes: 
+| summarize GB=sum(_BilledSize)/1024/1024/1024
