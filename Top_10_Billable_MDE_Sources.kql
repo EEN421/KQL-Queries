@@ -1,3 +1,5 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+
 // This query will break down your top 10 most expensive Microsoft Defender for Endpoint (MDE) log sources in the last 90 days
 // West US 2 Region Effective Cost per GB - https://azure.microsoft.com/en-ca/pricing/details/microsoft-sentinel/?cdn=disable
 
