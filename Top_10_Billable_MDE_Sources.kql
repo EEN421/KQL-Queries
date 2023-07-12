@@ -14,4 +14,4 @@ search *
 | limit 10                                 //<-- Limit results to top 10 entries
 
 // You can swap the below line into above query if you’re a stickler for Gibibytes versus Gigabytes: 
-| summarize GB=sum(_BilledSize)/1024/1024/1024
+| summarize EventCount=count(), Billable_GB=sum(_BilledSize/1024/1024/1024) by Type
