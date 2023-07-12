@@ -1,3 +1,8 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+
+// This query will break down your top 10 most expensive EventIDs from the Windows SecurityEvents table over the last 90 days
+// East US Region | 100GB/Day commitment tier | Effective Cost per GB - https://azure.microsoft.com/en-ca/pricing/details/microsoft-sentinel/?cdn=disable
+
 let cost=2.96; // <-- Set to Effective Cost per GB (URL in comments above)
 SecurityEvent
 | where TimeGenerated >ago(90d)            //<-- Run this query against the past quarter (90 days)
