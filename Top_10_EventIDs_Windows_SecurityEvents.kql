@@ -11,3 +11,5 @@ SecurityEvent
 | sort by Billable_GB desc                 //<-- Display results in descending order
 | extend Estimated_Cost=Billable_GB*cost   //<-- Create a column (extend) and fill it with results of "Billable_GB x cost" where cost is referenced above
 | limit 10                                 //<-- Limit results to top 10 entries
+
+| summarize EventCount=count(), Billable_GB=sum(_BilledSize/1024/1024/1024) by EventID
