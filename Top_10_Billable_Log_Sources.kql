@@ -1,0 +1,8 @@
+let cost=4.30; // <-- Set to Effective Cost per GB (URL in comments above)
+search *
+| where TimeGenerated >ago(30d)            //<-- Run this query against the past month
+| where _IsBillable == True                //<-- Filter out non-billable data
+| summarize EventCount=count(), Billable_GB=sum(_BilledSize/1000/1000/1000) by Type 
+| sort by Billable_GB desc                 //<-- Display results in descending order
+| extend Estimated_Cost=Billable_GB*cost   //<-- Create a column (extend) and fill it with results of "Billable_GB x cost" where cost is referenced above
+| limit 10                                 //<-- Limit results to top 10 entries
