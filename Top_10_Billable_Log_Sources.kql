@@ -1,3 +1,9 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+
+// This query will break down your top 10 most expensive log sources in the last 30 days
+// This is not the most efficient query performance-wise, as it queries 'everything' and can take a while to return results with large datasets.
+// Get your Effective Cost per GB here --> https://azure.microsoft.com/en-ca/pricing/details/microsoft-sentinel/?cdn=disable
+
 let cost=4.30; // <-- Set to Effective Cost per GB (URL in comments above)
 search *
 | where TimeGenerated >ago(30d)            //<-- Run this query against the past month
@@ -6,3 +12,6 @@ search *
 | sort by Billable_GB desc                 //<-- Display results in descending order
 | extend Estimated_Cost=Billable_GB*cost   //<-- Create a column (extend) and fill it with results of "Billable_GB x cost" where cost is referenced above
 | limit 10                                 //<-- Limit results to top 10 entries
+
+// You can swap the below line into above query if you’re a stickler for Gibibytes versus Gigabytes: 
+| summarize EventCount=count(), Billable_GB=sum(_BilledSize/1024/1024/1024) by Type
