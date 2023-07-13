@@ -1,6 +1,7 @@
 // Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
 
 // This query will break down your top 10 most expensive log sources (excluding Microsoft Defender for Endpoint [MDE] logs) in the last 90 days
+// This is not the most efficient query performance-wise, as it queries 'everything' and can take a while to return results with large datasets.
 // West US 2 Region Effective Cost per GB - https://azure.microsoft.com/en-ca/pricing/details/microsoft-sentinel/?cdn=disable
 
 let cost=4.30; // <-- Set to Effective Cost per GB (URL in comments above)
