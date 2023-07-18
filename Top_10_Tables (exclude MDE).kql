@@ -16,3 +16,19 @@ search *
 
 // You can swap the below line into above query if you’re a stickler for Gibibytes versus Gigabytes: 
 | summarize EventCount=count(), Billable_GB=sum(_BilledSize/1024/1024/1024) by Type
+
+
+
+==========================
+
+//More efficient way below? 
+
+Usage
+| where TimeGenerated > ago(90d)
+| where IsBillable == true
+| summarize GB = round(sum(Quantity)/1000,2) by DataType
+|extend dollar = round(GB*{CostPerGB},2)
+| extend TotalCost=strcat('$', dollar)
+| sort by TotalCost desc
+| where DataType !contains 'device'
+| limit 10
