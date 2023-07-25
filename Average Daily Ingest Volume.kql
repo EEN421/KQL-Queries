@@ -13,13 +13,13 @@ search *                                                                        
 
 =================================================
 
-Improved: 
+Improved/More Efficient Query: 
 
 Usage    //<-- Query the USAGE table (instead of "search *" to query everything)
 | where TimeGenerated > ago(30d)    //<-- Check the past 30 days
 | where IsBillable == true    //<-- Only include billable ingest volume
 | summarize GB= sum(Quantity)/1000 by bin(TimeGenerated,1d)      //<-- Summarize in GBs by Day
-| summarize AvgGBPerDay=percentiles(GB,50)      //<-- Take the average using the 50th percentile
+| summarize AvgGBPerDay=avgGB)      //<-- Take the average 
 | project AvgGBPerDay=strcat(round(AvgGBPerDay,2), ' GB/Day')       //<-- Convert to string and append "GB/Day"
 
 =================================================
