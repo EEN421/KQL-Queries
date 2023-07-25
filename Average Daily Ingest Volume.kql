@@ -19,7 +19,7 @@ Usage    //<-- Query the USAGE table (instead of "search *" to query everything)
 | where TimeGenerated > ago(30d)    //<-- Check the past 30 days
 | where IsBillable == true    //<-- Only include billable ingest volume
 | summarize GB= sum(Quantity)/1000 by bin(TimeGenerated,1d)      //<-- Summarize in GBs by Day
-| summarize AvgGBPerDay=avgGB)      //<-- Take the average 
+| summarize AvgGBPerDay=avg(GB)      //<-- Take the average 
 | project AvgGBPerDay=strcat(round(AvgGBPerDay,2), ' GB/Day')       //<-- Convert to string and append "GB/Day"
 
 =================================================
