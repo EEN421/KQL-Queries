@@ -24,7 +24,7 @@ Usage    //<-- Query the USAGE table (instead of "search *" to query everything)
 
 =================================================
 
-Includes Cost Calculation: 
+Improved/More Efficient AND Includes Cost Calculation: 
 
 let rate = 4.30;        //<-- Effective $ per GB rate for East US
 Usage    //<-- Query the USAGE table (instead of "search *" to query everything)
