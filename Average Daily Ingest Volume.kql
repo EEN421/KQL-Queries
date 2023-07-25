@@ -26,11 +26,12 @@ Usage    //<-- Query the USAGE table (instead of "search *" to query everything)
 
 Includes Cost Calculation: 
 
+let rate = 4.30;        //<-- Effective $ per GB rate for East US
 Usage    //<-- Query the USAGE table (instead of "search *" to query everything)
-|where TimeGenerated > ago(31d)    //<-- Check the past 30 days
-|where IsBillable == true    //<-- Only include billable ingest volume
-|summarize GB= sum(Quantity)/1000 by bin(TimeGenerated,1d)
-|extend Cost=GB*DATAVALUE_PRICE_PER_GB
-| summarize AvgCostPerDay=percentiles(Cost,50),AvgGBPerDay=percentiles(GB,50)
-| project AvgGBPerDay=strcat(round(AvgGBPerDay,2), ' GB/Day (Past 31 Days)')
-| extend Title = 'Avg. Daily Ingest'
+| where TimeGenerated > ago(31d)    //<-- Check the past 30 days
+| where IsBillable == true    //<-- Only include billable ingest volume
+| summarize GB= sum(Quantity)/1000 by bin(TimeGenerated,1d)     //<-- break it up into GB/Day
+| summarize AvgGBPerDay=avg(GB)     //<-- take the Average
+| extend Cost=AvgGBPerDay * rate     //<-- calculate average cost
+| project AvgGBPerDay=strcat(round(AvgGBPerDay,2), ' GB/Day'), AvgCostPerDay=strcat('$', round(Cost,2), ' /Day')
+//This line is tricky. I convert everything to string in order to prepend '$' and append ' /Day' to the results
