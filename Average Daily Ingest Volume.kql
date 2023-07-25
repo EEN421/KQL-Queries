@@ -15,9 +15,9 @@ search *                                                                        
 
 Improved: 
 
-Usage
-|where TimeGenerated > ago(31d)
-|where IsBillable == true
+Usage    //<-- Query the USAGE table (instead of "search *" to query everything)
+|where TimeGenerated > ago(31d)    //<-- Check the past 30 days
+|where IsBillable == true    //<-- Only include billable ingest volume
 |summarize GB= sum(Quantity)/1000 by bin(TimeGenerated,1d)
 |extend Cost=GB*DATAVALUE_PRICE_PER_GB
 | summarize AvgCostPerDay=percentiles(Cost,50),AvgGBPerDay=percentiles(GB,50)
