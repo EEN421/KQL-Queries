@@ -1,5 +1,6 @@
 // Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
 // This query doesn't just output the total average across the last 30 days' worth of data, this query breaks the data up into GB per day and takes the average from that. This step is crucial to get the most accurate and meaningful results. 
+// Check out the evolution of this query, it started out with the oldest/first iteration on top and the latest version at the bottom of this page, and all the stages in between. 
 
 search *                                                                                     //<-- Query Everything
 | where TimeGenerated > startofday(ago(30d)) and TimeGenerated < startofday(now())           //<-- Check the past 30 days
