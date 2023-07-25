@@ -2,7 +2,7 @@
 // This query doesn't just output the total average across the last 30 days' worth of data, this query breaks the data up into GB per day and takes the average from that. This step is crucial to get the most accurate and meaningful results. 
 // Check out the evolution of this query; different iterations of this query from oldest to newest are listed from top to bottom below:
 
-Original Query:
+Original Query (this one takes forever and is not efficient):
 
 search *                                                                                     //<-- Query Everything
 | where TimeGenerated > startofday(ago(30d)) and TimeGenerated < startofday(now())           //<-- Check the past 30 days
