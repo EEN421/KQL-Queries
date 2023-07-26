@@ -31,7 +31,7 @@ Improved/More Efficient AND Includes Cost Calculation:
 
 let rate = 4.30;                                                       //<-- Effective $ per GB rate for East US
 Usage                                                                  //<-- Query the USAGE table (instead of "search *" to query everything)
-| where TimeGenerated > ago(31d)                                       //<-- Check the past 30 days
+| where TimeGenerated > ago(30d)                                       //<-- Check the past 30 days
 | where IsBillable == true                                             //<-- Only include billable ingest volume
 | summarize GB= sum(Quantity)/1000 by bin(TimeGenerated,1d)            //<-- break it up into GB/Day
 | summarize AvgGBPerDay=avg(GB)                                        //<-- take the Average
