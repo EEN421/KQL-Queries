@@ -17,7 +17,7 @@ search *                                                                        
 ===================================================
 
 Usage
-|where TimeGenerated > ago(31d)
+|where TimeGenerated > ago(30d)
 |where IsBillable == true
 |summarize GB= sum(Quantity)/1000 by bin(TimeGenerated,1d)
 |extend Cost=GB*DATAVALUE_PRICE_PER_GB
