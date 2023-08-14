@@ -1,0 +1,9 @@
+SecurityEvent
+| where _IsBillable == True                //<-- Filter out non-billable data
+| summarize EventCount=count(), Billable_GB=sum(_BilledSize / 1000 / 1000 / 1000) by EventID
+| extend TotalCost = round(Billable_GB * 5.22, 2)
+//| sort by TotalCost desc                  //<-- identical results if you comment out line 7 and use this instead
+| extend TotalCost=strcat('$', TotalCost)
+| sort by Billable_GB desc                 //<-- Display results in descending order
+| project-away EventCount                   //<-- comment this out for a total count of number of hits for each EventID
+| limit 10
