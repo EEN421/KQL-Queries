@@ -1,0 +1,9 @@
+WindowsEvent
+| where TimeGenerated >ago(90d)
+| where EventID == "4672"
+| where _IsBillable == True                //<-- Filter out non-billable data
+| summarize Billable_GB=round(sum(_BilledSize / 1000 / 1000 / 1000),2) by Computer
+| extend TotalCost = round(Billable_GB * 5.59, 2)
+| extend TotalCost=strcat('$', TotalCost)
+| sort by Billable_GB desc                 //<-- Display results in descending order
+| limit 10
