@@ -7,7 +7,7 @@ Original Query (this one takes forever and is not efficient):
 search *                                                                                     //<-- Query Everything
 | where TimeGenerated > startofday(ago(30d)) and TimeGenerated < startofday(now())           //<-- Check the past 30 days
 | where _IsBillable == True                                                                  //<-- Only include billable ingest volume
-| summarize TotalGB = round(sum(_BilledSize/1000/1000/1000)) by bin(TimeGenerated, 1d)       //<-- Summarize billable volume in GB using the _BilledSize table column
+| summarize TotalGB = round(sum(_BilledSize/1000/1000/1000),2) by bin(TimeGenerated, 1d)       //<-- Summarize billable volume in GB using the _BilledSize table column
 | summarize avg(TotalGB)                                                                     //<-- Summarize and return the daily average
 
 // You can swap the below line into above query if you’re a stickler for Gibibytes versus Gigabytes: 
