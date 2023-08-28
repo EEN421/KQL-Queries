@@ -1,0 +1,9 @@
+// day by day change in percentage
+Usage
+| where TimeGenerated > startofday(ago(31d))
+| summarize IngestedGB = round(sum(Quantity)/1024,3) by bin(TimeGenerated, 1d)
+| sort by TimeGenerated asc 
+| serialize previous_IngestedGB = prev(IngestedGB)
+| extend PercentChange = round((IngestedGB - previous_IngestedGB) / previous_IngestedGB * 100, 0)
+//| where PercentChange >= 100 or PercentChange <= -50
+| render columnchart
