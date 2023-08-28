@@ -14,3 +14,15 @@ SecurityEvent		             		        //<-- Query the SecurityEvent table
 
 //You can change the last line in the above query to the following if you’re a stickler for Gibibytes versus Gigabytes: 
 | summarize GB=sum(_BilledSize)/1024/1024/1024	
+
++++++++++++++++++++++++++++++++++++++++++++++++++
+
+SecurityEvent
+| where TimeGenerated >ago(90d)
+| where EventID == "5156"
+| where _IsBillable == True
+| summarize Billable_GB=round(sum(_BilledSize / 1000 / 1000 / 1000),2) by Computer
+| extend TotalCost = round(Billable_GB * 2.74, 2)
+| extend TotalCost=strcat('$', TotalCost)
+| sort by Billable_GB desc
+| limit 10
