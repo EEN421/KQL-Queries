@@ -12,3 +12,14 @@ Syslog                                            //<-- Query the Syslog table
 
 //You can change the last line in the above query to the following if you’re a stickler for Gibibytes versus Gigabytes: 
 | summarize GB=sum(_BilledSize)/1024/1024/1024	
+
+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+Syslog
+| where TimeGenerated >ago(90d)
+| where _IsBillable == True
+| summarize Billable_GB=round(sum(_BilledSize / 1000 / 1000 / 1000),2) by SeverityLevel
+| extend TotalCost = round(Billable_GB * 5.16, 2)
+| extend TotalCost=strcat('$', TotalCost)
+| sort by Billable_GB desc
+| limit 10
