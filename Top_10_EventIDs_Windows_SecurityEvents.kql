@@ -7,9 +7,10 @@ let cost=2.96; // <-- Set to Effective Cost per GB (URL in comments above)
 SecurityEvent
 | where TimeGenerated >ago(90d)            //<-- Run this query against the past quarter (90 days)
 | where _IsBillable == True                //<-- Filter out non-billable data
-| summarize EventCount=count(), Billable_GB=sum(_BilledSize/1000/1000/1000) by Activity
+| summarize EventCount=count(), Billable_GB=round(sum(_BilledSize/1000/1000/1000),2) by Activity
 | sort by Billable_GB desc                 //<-- Display results in descending order
-| extend Estimated_Cost=Billable_GB*cost   //<-- Create a column (extend) and fill it with results of "Billable_GB x cost" where cost is referenced above
+| extend Estimated_Cost=round(Billable_GB*cost, 2)   //<-- Create a column (extend) and fill it with results of "Billable_GB x cost" where cost is referenced above
+| sort by Billable_GB desc 
 | limit 10                                 //<-- Limit results to top 10 entries
 
 // You can swap the below line into above query if you’re a stickler for Gibibytes versus Gigabytes: 
