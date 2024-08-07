@@ -1,0 +1,8 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// This is the KQL behind an Analytics Rule I built for a demo to create alerts in Sentinel for 3 or more Failed Login Attempts in under 2 minutes. 
+// The idea here was to create a logic app to trigger on this rule and disable/lockout the account. 
+
+SigninLogs
+| where ResultType == 50126
+| summarize FailedAttempts = count() by Identity, bin(TimeGenerated, 2m)
+| where FailedAttempts >= 3
