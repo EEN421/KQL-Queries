@@ -1,6 +1,7 @@
 // Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
 // This is the KQL behind an Analytics Rule I built for a demo to create alerts in Sentinel for 3 or more Failed Login Attempts in under 2 minutes. 
-// The idea here was to create a logic app to trigger on this rule and disable/lockout the account. 
+// The idea here was to create a logic app to trigger on this rule and disable/lockout the account.
+// ErrorID 50126 is thrown when an invalid username or password is used: https://www.manageengine.com/products/active-directory-audit/kb/azure-error-codes/azure-ad-sign-in-error-code-50126.html
 
 SigninLogs
 | where ResultType == 50126
