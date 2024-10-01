@@ -1,0 +1,7 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// This is great for tracking down activity for 'those' users (every company has one). 
+// Be warned, this is a powerful query that could get you into GDPR trouble as it returns a detailed account of user activity history, including browser URLs etc. 
+
+union DeviceEvents,DeviceNetworkEvents,DeviceFileEvents
+| where RemoteUrl != '' or FileOriginUrl != '' or FileOriginReferrerUrl != ''
+| summarize count() by Type,ActionType,RemoteUrl,FileOriginUrl,FileOriginReferrerUrl
