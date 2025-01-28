@@ -1,0 +1,4 @@
+Usage // Query the Usage table
+| where IsBillable == true // Only include 'billable' data
+| summarize TotalVolumeGB = sum(Quantity) / 1000 by bin(StartTime, 1d), Solution // Aggregate by day and solution
+| render columnchart // Visualize as a column chart
