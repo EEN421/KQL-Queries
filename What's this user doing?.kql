@@ -2,6 +2,15 @@
 // This is great for tracking down activity for 'those' users (every company has one). 
 // Be warned, this is a powerful query that could get you into GDPR trouble as it returns a detailed account of user activity history, including browser URLs etc. 
 
-union DeviceEvents,DeviceNetworkEvents,DeviceFileEvents
-| where RemoteUrl != '' or FileOriginUrl != '' or FileOriginReferrerUrl != ''
-| summarize count() by Type,ActionType,RemoteUrl,FileOriginUrl,FileOriginReferrerUrl
+union DeviceEvents,DeviceNetworkEvents,DeviceFileEvents    //<-- query Device Events, DeviceNetworkEvents, and DeviceFileEvents tables and combine the results.
+| where RemoteUrl contains '' or FileOriginUrl != '' or FileOriginReferrerUrl != ''    //<-- show me every website URL, file URL, etc. that this user has touched.
+| where InitiatingProcessAccountName contains 'InitiatingProcessAccountName'  //<-- swap out InitiatingProcessAccountName for a user you want to track activity for (leave the '').
+| summarize count() by Type,ActionType,RemoteUrl,FileOriginUrl,FileOriginReferrerUrl, TimeGenerated, DeviceName  //<-- Return time-stamped results for each action.
+
+
+// The below example has been tweaked to show time-stamped Facebook usage by device. This query is like a swiss army knife given you can potentially do with it. Keep it in your toolbelt. 
+
+union DeviceEvents,DeviceNetworkEvents,DeviceFileEvents    //<-- query Device Events, DeviceNetworkEvents, and DeviceFileEvents tables and combine the results.
+| where RemoteUrl contains 'facebook'    //<-- show me every instance where this user visited Facebook.
+| where InitiatingProcessAccountName contains 'InitiatingProcessAccountName'  //<-- swap out InitiatingProcessAccountName for an user you want to track activity for (leave the '').
+| summarize count() by Type,ActionType,RemoteUrl,FileOriginUrl,FileOriginReferrerUrl, TimeGenerated, DeviceName  //<-- Return time-stamped results for each action and the Device it was performed from.
