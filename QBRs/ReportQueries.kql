@@ -178,7 +178,5 @@ PriorData
     ['Change (GB)'] = round(CurrentGB - PriorGB, 2),
     ['Change %'] = iif(PriorGB > 0, round(((CurrentGB - PriorGB) / PriorGB) * 100, 1), 100.0)
 | where ['Current 30 Days (GB)'] > 0 or ['Previous 30 Days (GB)'] > 0
+| where ['Data Source'] contains 'device'
 | top 5 by abs(['Change (GB)']) desc
-| sort by TotalCost desc
-| where DataType contains 'device'
-| limit 10
