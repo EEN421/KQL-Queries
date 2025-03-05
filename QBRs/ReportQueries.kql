@@ -101,7 +101,7 @@ SecurityIncident
 | order by Severity asc
 
 
-
+//Firewall Stuff (Fortigate)
 CommonSecurityLog 
 | where TimeGenerated > ago(90d)
 | summarize count() by Activity //DeviceEventCategory //TimeGenerated
