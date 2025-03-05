@@ -1,0 +1,49 @@
+//MTTR
+SecurityIncident
+| where TimeGenerated > ago(90d)
+| where Status == "Closed"
+| summarize MTTR = avg(datetime_diff('minute', ClosedTime, CreatedTime))
+
+//Top 10 Alerts
+SecurityAlert
+| where TimeGenerated > ago(90d)
+| summarize Count = count() by AlertName
+| top 10 by Count desc;
+
+//Incidents by Severity
+SecurityIncident
+| where TimeGenerated > ago(90d)
+| summarize Count = count() by Severity
+| sort by Severity asc
+| render barchart
+
+//Incidents by Product
+SecurityAlert
+| where TimeGenerated > ago(90d)
+| summarize Count = count() by ProductName
+| sort by Count desc
+| top 10 by Count
+| render barchart
+
+// Identifies alerts with significant increases compared to previous period
+let timeRange = 90d;
+SecurityAlert
+| where TimeGenerated > ago(timeRange)
+| summarize CurrentCount = count() by AlertName
+| join kind=fullouter (
+    SecurityAlert
+    | where TimeGenerated > ago(2*timeRange) and TimeGenerated <= ago(timeRange)
+    | summarize PreviousCount = count() by AlertName
+) on AlertName
+| project AlertName, 
+          CurrentCount = coalesce(CurrentCount, 0), 
+          PreviousCount = coalesce(PreviousCount, 0),
+          PercentChange = iff(PreviousCount == 0, 100.0, (CurrentCount - PreviousCount) * 100.0 / PreviousCount)
+| where CurrentCount > 10 // Filter out low-volume alerts
+| where PercentChange > 50 // Show significant increases
+| sort by PercentChange desc
+| top 10 by PercentChange
+| project ["Alert Type"] = AlertName, 
+          ["Current Period"] = CurrentCount, 
+          ["Previous Period"] = PreviousCount, 
+          ["% Change"] = round(PercentChange, 2)
