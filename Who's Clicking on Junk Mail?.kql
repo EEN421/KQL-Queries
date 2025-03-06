@@ -1,0 +1,5 @@
+let JunkedEmails = EmailEvents
+| where DeliveryLocation == "Junk folder"
+| distinct NetworkMessageId;
+UrlClickEvents
+| where NetworkMessageId in(JunkedEmails)
