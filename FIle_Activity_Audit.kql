@@ -1,0 +1,6 @@
+union DeviceEvents,DeviceNetworkEvents,DeviceFileEvents    //<-- query Device Events, DeviceNetworkEvents, and DeviceFileEvents tables and combine the results.
+| where RemoteUrl contains '' or FileOriginUrl != '' or FileOriginReferrerUrl != ''    //<-- show me every website URL, file URL, etc. that this user has touched.
+| where InitiatingProcessAccountName contains 'InitiatingProcessAccountName'  //<-- swap out InitiatingProcessAccountName for a user you want to track activity for, like 'john.smith' for example.
+| where ActionType contains "File" and ActionType !contains "Shell"
+| summarize count() by InitiatingProcessAccountName,ActionType,FileName,RemoteUrl,FileOriginUrl,FileOriginReferrerUrl, TimeGenerated, DeviceName  //<-- Return time-stamped results for each action.
+| project-away count_
