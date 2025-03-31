@@ -1,0 +1,4 @@
+//Query Type Distribution
+pihole_CL
+| summarize Total = count() by DnsQueryTypeName_s
+| order by Total desc
