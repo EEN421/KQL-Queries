@@ -1,0 +1,6 @@
+Usage
+| where TimeGenerated > ago(90d) 
+| where IsBillable == true
+| where DataType == "pihole_CL"
+| summarize TotalVolumeGB = sum(Quantity) / 1000 by bin(StartTime, 1d), DataType
+| render columnchart     
