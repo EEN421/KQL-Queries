@@ -1,0 +1,4 @@
+//Top Clients Making DNS Requests
+pihole_CL
+| summarize Requests = count() by SrcIpAddr_s
+| top 10 by Requests
