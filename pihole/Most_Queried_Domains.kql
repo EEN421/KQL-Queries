@@ -1,0 +1,4 @@
+//Most Queried Domains
+pihole_CL
+| summarize QueryCount = count() by DnsQuery_s
+| top 10 by QueryCount
