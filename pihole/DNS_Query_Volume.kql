@@ -1,0 +1,4 @@
+// DNS Query Volume (All Traffic)
+pihole_CL
+| summarize TotalQueries = count() by bin(TimeGenerated, 1h)
+| render timechart
