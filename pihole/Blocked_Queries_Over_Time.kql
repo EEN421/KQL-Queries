@@ -1,0 +1,5 @@
+//Blocked DNS Queries Over Time
+pihole_CL
+| where EventResult_s == "Failure"
+| summarize BlockedRequests = count() by bin(TimeGenerated, 1h)
+| render timechart
