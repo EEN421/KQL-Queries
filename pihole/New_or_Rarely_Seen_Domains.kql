@@ -1,0 +1,11 @@
+//New or Rarely Seen Domains
+let cutoff = ago(24h);
+let recent = pihole_CL
+| where TimeGenerated > cutoff
+| summarize count() by DnsQuery_s;
+let historic = pihole_CL
+| where TimeGenerated <= cutoff
+| summarize count() by DnsQuery_s;
+recent
+| join kind=leftanti historic on DnsQuery_s
+| top 20 by count_
