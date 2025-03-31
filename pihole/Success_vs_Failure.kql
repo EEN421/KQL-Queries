@@ -1,0 +1,4 @@
+//Success vs. Failure Ratios Over Time
+pihole_CL
+| summarize Count = count() by bin(TimeGenerated, 1h), EventResult_s
+| render timechart
