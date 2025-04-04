@@ -1,5 +1,5 @@
-//Top Blocked Domains
-pihole_CL
-| where EventResult_s == "Failure"
-| summarize BlockCount = count() by DnsQuery_s
-| top 10 by BlockCount
+// Identify the top 10 blocked domains
+PiHole
+| where QueryType == "Blocked"  // Filter for blocked queries
+| summarize Count = count() by Domain  // Aggregate counts by domain
+| top 10 by Count  // Select the top 10 domains by count

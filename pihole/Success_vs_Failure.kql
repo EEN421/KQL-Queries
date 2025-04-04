@@ -1,4 +1,5 @@
-//Success vs. Failure Ratios Over Time
-pihole_CL
-| summarize Count = count() by bin(TimeGenerated, 1h), EventResult_s
-| render timechart
+// Compare the number of successful versus failed DNS queries
+
+PiHole
+| summarize Count = count() by ResponseCode  // Aggregate counts by response code
+| render barchart  // Visualize the data as a bar chart

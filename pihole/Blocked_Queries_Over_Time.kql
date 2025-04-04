@@ -1,5 +1,7 @@
-//Blocked DNS Queries Over Time
-pihole_CL
-| where EventResult_s == "Failure"
-| summarize BlockedRequests = count() by bin(TimeGenerated, 1h)
-| render timechart
+
+// Summarize the count of blocked DNS queries over time
+
+PiHole
+| where QueryType == "Blocked"  // Filter for blocked queries
+| summarize Count = count() by bin(TimeGenerated, 1h)  // Aggregate counts in 1-hour intervals
+| render timechart  // Visualize the data as a time chart

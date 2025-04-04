@@ -9,3 +9,10 @@ let historic = pihole_CL
 recent
 | join kind=leftanti historic on DnsQuery_s
 | top 20 by count_
+
+// Alternate query:
+// Identify domains that have been queried for the first time or are rarely seen
+PiHole
+| summarize Count = count(), FirstSeen = min(TimeGenerated) by Domain  // Aggregate counts and first seen time by domain
+| where Count < 5  // Filter for domains queried less than 5 times
+| order by FirstSeen desc  // Order by the first seen time in descending order

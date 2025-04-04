@@ -1,4 +1,6 @@
-//Query Type Distribution
-pihole_CL
-| summarize Total = count() by DnsQueryTypeName_s
-| order by Total desc
+// Determine the distribution of query types
+
+PiHole
+| summarize Count = count() by QueryType  // Aggregate counts by query type
+| render piechart  // Visualize the data as a pie chart
+

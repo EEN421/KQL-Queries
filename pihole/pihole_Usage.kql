@@ -4,3 +4,11 @@ Usage
 | where DataType == "pihole_CL"
 | summarize TotalVolumeGB = sum(Quantity) / 1000 by bin(StartTime, 1d), DataType
 | render columnchart     
+
+// Alternate Query
+// Summarize Pi-hole usage statistics over time
+PiHole
+| summarize TotalQueries = count(), BlockedQueries = countif(QueryType == "Blocked") by bin(TimeGenerated, 1h)  // Aggregate total and blocked queries in 1-hour intervals
+| extend BlockedPercentage = todouble(BlockedQueries) / todouble(TotalQueries) * 100  // Calculate the percentage of blocked queries
+| render timechart  // Visualize the data as a time chart
+
