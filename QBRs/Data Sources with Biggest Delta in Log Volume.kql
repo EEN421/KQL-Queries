@@ -1,0 +1,36 @@
+let PriorPeriod = toscalar(
+    Usage
+    | where TimeGenerated > ago(60d) and TimeGenerated <= ago(30d)
+    | where IsBillable == true
+    | summarize min(TimeGenerated)
+);
+let CurrentPeriod = toscalar(
+    Usage
+    | where TimeGenerated > ago(30d)
+    | where IsBillable == true
+    | summarize max(TimeGenerated)
+);
+let PriorData = Usage
+    | where TimeGenerated between (PriorPeriod .. ago(30d))
+    | where IsBillable == true
+    | summarize PriorGB = round(todouble(sum(Quantity))/1024, 2) by DataType;
+let CurrentData = Usage
+    | where TimeGenerated > ago(30d)
+    | where IsBillable == true
+    | summarize CurrentGB = round(todouble(sum(Quantity))/1024, 2) by DataType;
+PriorData
+| join kind=fullouter CurrentData on DataType
+| extend 
+    DataType = coalesce(DataType, DataType1),
+    PriorGB = coalesce(PriorGB, 0.0),
+    CurrentGB = coalesce(CurrentGB, 0.0),
+    ChangeGB = coalesce(CurrentGB - PriorGB, 0.0)
+| project 
+    ['Data Source'] = DataType,
+    ['Previous 30 Days (GB)'] = PriorGB,
+    ['Current 30 Days (GB)'] = CurrentGB,
+    ['Change (GB)'] = round(CurrentGB - PriorGB, 2),
+    ['Change %'] = iif(PriorGB > 0, round(((CurrentGB - PriorGB) / PriorGB) * 100, 1), 100.0),
+    ['Change $'] = strcat('$', round(ChangeGB * {CostPerGB}, 2))
+| where ['Current 30 Days (GB)'] > 0 or ['Previous 30 Days (GB)'] > 0
+| top 10 by abs(['Change (GB)']) desc
