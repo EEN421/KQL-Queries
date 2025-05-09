@@ -1,0 +1,5 @@
+SecurityEvent
+| where TimeGenerated > ago (90d)
+| where EventID == "4726"
+| extend Actor_ = Account
+| project-reorder TimeGenerated, Activity, Actor_, TargetAccount, Computer
