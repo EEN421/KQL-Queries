@@ -1,3 +1,8 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+//
+// This query is written in Kusto Query Language (KQL) and is designed to identify employees who are using Outlook on their work machines to
+// send emails via third-party SMTP servers, potentially with attachments.
+
 let corpDomains=dynamic(["yourDomain", "subsidiary.org"]); // internal domains
 let mailDomains=dynamic(["smtp.gmail.com","smtp.mail.yahoo.com","smtp.zoho.com","smtp.mail.me.com"]); // 3rd-party SMTP
 let smtpPorts=dynamic([465,587]); // SMTP ports
