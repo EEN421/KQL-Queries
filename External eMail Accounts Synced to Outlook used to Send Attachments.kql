@@ -1,0 +1,33 @@
+let corpDomains=dynamic(["yourDomain", "subsidiary.org"]); // internal domains
+let mailDomains=dynamic(["smtp.gmail.com","smtp.mail.yahoo.com","smtp.zoho.com","smtp.mail.me.com"]); // 3rd-party SMTP
+let smtpPorts=dynamic([465,587]); // SMTP ports
+let OutlookEmailSends=OfficeActivity
+| where TimeGenerated>=ago(90d)
+| where RecordType=="Send"
+| where Client has "Outlook"
+| extend SenderDomain=tolower(split(UserId,"@")[1]) // domain from email
+| where SenderDomain !in (corpDomains)
+| project OA_Time=TimeGenerated,UserId,SenderDomain,Operation,Client,ClientIP; // email send info
+let OutlookSMTP=DeviceNetworkEvents
+| where TimeGenerated>=ago(90d)
+| where InitiatingProcessFileName=~"OUTLOOK.EXE"
+| where RemoteUrl has_any (mailDomains) or RemotePort in (smtpPorts)
+| project DN_Time=TimeGenerated,DeviceName,InitiatingProcessAccountName,RemoteUrl,RemotePort,InitiatingProcessCommandLine; // SMTP connection
+let OutlookProcess=DeviceProcessEvents
+| where TimeGenerated>=ago(90d)
+| where FileName=~"OUTLOOK.EXE"
+| project DP_Time=TimeGenerated,DeviceName,AccountName,FolderPath,ProcessCommandLine; // outlook running
+let RecentFiles=DeviceFileEvents
+| where TimeGenerated>=ago(90d)
+| where FileName endswith ".pdf" or FileName endswith ".docx" or FileName endswith ".xlsx"
+| where InitiatingProcessFileName=~"OUTLOOK.EXE"
+| project DF_Time=TimeGenerated,DeviceName,FileName,FolderPath,InitiatingProcessAccountName; // possible attachments
+OutlookEmailSends
+| join kind=inner (OutlookSMTP) on $left.UserId==$right.InitiatingProcessAccountName
+| join kind=inner (OutlookProcess) on DeviceName
+| join kind=leftouter (RecentFiles) on $left.DeviceName==$right.DeviceName
+| where abs(datetime_diff("minute",OA_Time,DN_Time))<15
+| where abs(datetime_diff("minute",OA_Time,DP_Time))<15
+| where isnull(DF_Time) or abs(datetime_diff("minute",OA_Time,DF_Time))<10
+| project OA_Time,DN_Time,DP_Time,DF_Time,UserId,SenderDomain,DeviceName,RemoteUrl,RemotePort,InitiatingProcessCommandLine,FileName,FolderPath,Client,Operation
+| order by OA_Time desc
