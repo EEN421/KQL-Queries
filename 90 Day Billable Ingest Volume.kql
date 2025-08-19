@@ -7,3 +7,10 @@ Usage                                                                           
 | where IsBillable == true                                                          // <--Only include 'billable' data
 | summarize TotalVolumeGB = sum(Quantity) / 1000 by bin(StartTime, 1d), Solution    // <--Chop it up into GB / Day
 | render columnchart                                                                // <--Graph the results
+
+//The below query will return the total billable GB and incurred cost per day. 
+Usage                                                                               // <--Query the Usage table
+| where TimeGenerated > ago(90d)                                                    // <--Query the last 90 days
+| where IsBillable == true                                                          // <--Only include 'billable' data
+| summarize TotalVolumeGB = round(sum(Quantity) / 1024, 2) by bin(StartTime, 1d)    // <--Chop it up into GB / Day
+| extend  cost=strcat('$', round(TotalVolumeGB*4.30, 2))                            // <--Round to 2 decimal places, calculate the cost, and prepend '$'
