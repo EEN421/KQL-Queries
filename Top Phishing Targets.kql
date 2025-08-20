@@ -1,0 +1,37 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// Identifies top recipients of phishing emails and categorizes severity based on volume
+
+EmailEvents
+| where ThreatTypes has "Phish"
+| summarize PhishCount = count() by RecipientEmailAddress
+// Assign severity level indicators based on PhishCount
+| extend SeverityIndicator = case(
+                                 PhishCount >= 500,
+                                 "🔥 Extreme Target",
+                                 PhishCount >= 200,
+                                 "🔴 Critical Target",
+                                 PhishCount >= 100,
+                                 "🟠 Major Target",
+                                 PhishCount >= 50,
+                                 "🟡 Moderate Target",
+                                 "🟢 Low Target"
+                             )
+// Apply color coding to PhishCount
+| extend CountColor = case(
+                          PhishCount >= 500,
+                          "🔥",
+                          PhishCount >= 200,
+                          "🔴",
+                          PhishCount >= 100,
+                          "🟠",
+                          PhishCount >= 50,
+                          "🟡",
+                          "🟢"
+                      )
+// Sort by the highest volume of phishing emails received
+| top 10 by PhishCount desc
+// Improve column naming for readability
+| project
+    ["Recipient Email"] = RecipientEmailAddress, 
+    ["Phishing Emails Received"] = strcat(CountColor, " ", PhishCount),
+    ["Severity"] = SeverityIndicator
