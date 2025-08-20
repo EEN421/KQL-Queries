@@ -1,0 +1,24 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// Top Log Sources with Cost (Enhanced with Colors & Emojis)
+
+Usage
+| where IsBillable == true
+| summarize GB= round(sum(Quantity) / 1000, 2) by DataType
+| extend Cost=round(GB * 5.16, 2)
+| sort by Cost desc
+| extend CostLevel = case(
+                         Cost >= 1000,
+                         '🤑🤑🤑🤑🤑',  // Most Expensive
+                         Cost >= 750,
+                         '💰💰💰💰',
+                         Cost >= 500,
+                         '💰💰💰',
+                         Cost >= 250,
+                         '💰💰',
+                         Cost >= 100,
+                         '💰',          // Least Expensive
+                         '💸'                         // Fallback
+                     )
+| extend Cost=strcat('$', Cost, ' ', CostLevel)
+| project DataType, GB, Cost
+| take 10
