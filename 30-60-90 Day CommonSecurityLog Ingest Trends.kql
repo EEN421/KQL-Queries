@@ -1,5 +1,7 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
 // Compare CommonSecurityLog ingest trends by DeviceAction across 30, 60, and 90 day periods
 // This query analyzes security log volume changes to identify trends and cost impacts
+
 // Period 1: 60-90 days ago (oldest period)
 let Period90Days = CommonSecurityLog
     | where TimeGenerated > ago(90d) and TimeGenerated <= ago(60d)  // Filter to 60-90 days ago
