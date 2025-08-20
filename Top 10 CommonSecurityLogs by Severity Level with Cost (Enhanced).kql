@@ -1,0 +1,25 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// Top Security Log Reasons with Cost (Enhanced with Colors & Emojis)
+
+CommonSecurityLog
+| where isnotempty(Reason) and Reason != "N/A"
+| extend LogSizeBytes = strlen(tostring(pack_all()))  // Estimate log size per record
+| summarize TotalEvents = count(), TotalGB = sum(LogSizeBytes) / (1024 * 1024 * 1024) by Reason, LogSeverity
+| extend RawCost = round(TotalGB * 5.16, 2)
+| sort by TotalEvents desc
+| extend CostLevel = case(
+                         RawCost >= 1000,
+                         '🤑🤑🤑🤑🤑',  // Most Expensive
+                         RawCost >= 750,
+                         '💰💰💰💰',
+                         RawCost >= 500,
+                         '💰💰💰',
+                         RawCost >= 250,
+                         '💰💰',
+                         RawCost >= 100,
+                         '💰',          // Least Expensive
+                         '💸'                             // Fallback
+                     )
+| extend IngestCost = strcat('$', tostring(RawCost), ' ', CostLevel)
+| project Reason, LogSeverity, TotalEvents, TotalGB, IngestCost
+| top 10 by TotalEvents desc
