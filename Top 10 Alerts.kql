@@ -1,0 +1,20 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// Top 10 Alerts with Percentage of Total Alerts - Updated/Advanced
+
+let totalAlerts = toscalar(SecurityAlert
+    | where TimeGenerated > ago(90d)
+    | summarize TotalCount = count());
+SecurityAlert
+| where TimeGenerated > ago(90d)
+| summarize Count = count() by AlertName
+| top 10 by Count desc
+| extend PercentageValue = round((Count * 100.0) / totalAlerts, 2)
+| extend Percentage = strcat(PercentageValue, '%')
+| extend Alert_Severity = case(
+                              PercentageValue > 20,
+                              '🔥 High Impact', 
+                              PercentageValue > 10,
+                              '⚠️ Moderate', 
+                              '✅ Low Impact'
+                          )
+| project AlertName, Count, Percentage, ["Impact Level"] = Alert_Severity
