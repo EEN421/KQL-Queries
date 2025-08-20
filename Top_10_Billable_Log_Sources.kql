@@ -15,3 +15,26 @@ search *
 
 // You can swap the below line into above query if you’re a stickler for Gibibytes versus Gigabytes: 
 | summarize EventCount=count(), Billable_GB=sum(_BilledSize/1024/1024/1024) by Type
+
+// Enhanced with Colors & Emojis
+Usage
+| where IsBillable == true
+| summarize GB= round(sum(Quantity) / 1000, 2) by DataType
+| extend Cost=round(GB * 5.16, 2)
+| sort by Cost desc
+| extend CostLevel = case(
+                         Cost >= 1000,
+                         '🤑🤑🤑🤑🤑',  // Most Expensive
+                         Cost >= 750,
+                         '💰💰💰💰',
+                         Cost >= 500,
+                         '💰💰💰',
+                         Cost >= 250,
+                         '💰💰',
+                         Cost >= 100,
+                         '💰',          // Least Expensive
+                         '💸'                         // Fallback
+                     )
+| extend Cost=strcat('$', Cost, ' ', CostLevel)
+| project DataType, GB, Cost
+| take 10
