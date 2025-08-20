@@ -1,4 +1,6 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
 // Top Security Events with Cost (Enhanced with Colors & Emojis)
+
 SecurityEvent
 | where _IsBillable == True
 | summarize EventCount=count(), GB=round(sum(_BilledSize / 1000 / 1000 / 1000), 2) by EventID
