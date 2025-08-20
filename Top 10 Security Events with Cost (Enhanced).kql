@@ -1,0 +1,22 @@
+// Top Security Events with Cost (Enhanced with Colors & Emojis)
+SecurityEvent
+| where _IsBillable == True
+| summarize EventCount=count(), GB=round(sum(_BilledSize / 1000 / 1000 / 1000), 2) by EventID
+| extend TotalCost = round(GB * 5.16, 2)
+| sort by GB desc
+| extend CostLevel = case(
+                         TotalCost >= 1000,
+                         '🤑🤑🤑🤑🤑',  // Most Expensive
+                         TotalCost >= 750,
+                         '💰💰💰💰',
+                         TotalCost >= 500,
+                         '💰💰💰',
+                         TotalCost >= 250,
+                         '💰💰',
+                         TotalCost >= 100,
+                         '💰',          // Least Expensive
+                         '💸'                             // Fallback
+                     )
+| extend TotalCost=strcat('$', TotalCost, ' ', CostLevel)
+| project EventID, GB, TotalCost
+| limit 10
