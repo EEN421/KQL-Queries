@@ -1,0 +1,19 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// This query identifies events mapped against the MITRE ATT&CK Matrix that have been observed in the environment
+
+let TotalCount = toscalar(
+    SecurityAlert
+    | where TimeGenerated > ago(90d)
+    | where isnotempty(Techniques)
+    | mv-expand technique = split(Techniques, ", ")
+    | summarize TotalCount = count()
+    );
+SecurityAlert
+| where TimeGenerated > ago(90d)
+| where isnotempty(Techniques)
+| mv-expand technique = split(Techniques, ", ")
+| summarize Count = count() by tostring(technique)
+| extend Percentage = strcat(round(Count * 100.0 / TotalCount, 2), '%')
+| sort by Count desc
+| top 10 by Count
+| project ["MITRE Technique"] = technique, Count, Percentage
