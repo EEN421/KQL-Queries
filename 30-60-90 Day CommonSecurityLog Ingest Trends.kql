@@ -1,0 +1,70 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// Compare Usage trends across 30, 60, and 90 day periods to highlight ingest trends
+
+// Get data from 60–90 days ago
+let Period90Days = Usage
+    // Only include records between 60 and 90 days old
+    | where TimeGenerated > ago(90d) and TimeGenerated <= ago(60d)
+    // Only include billable data
+    | where IsBillable == true
+    // Summarize usage by DataType, convert to GB, round to 2 decimals
+    | summarize Period90GB = round(todouble(sum(Quantity)) / 1024, 2) by DataType;
+// Get data from 30–60 days ago
+let Period60Days = Usage
+    | where TimeGenerated > ago(60d) and TimeGenerated <= ago(30d)
+    | where IsBillable == true
+    | summarize Period60GB = round(todouble(sum(Quantity)) / 1024, 2) by DataType;
+// Get data from the last 30 days
+let Period30Days = Usage
+    | where TimeGenerated > ago(30d)
+    | where IsBillable == true
+    | summarize Period30GB = round(todouble(sum(Quantity)) / 1024, 2) by DataType;
+// Join all three sets together on DataType
+Period90Days
+| join kind=fullouter Period60Days on DataType
+| join kind=fullouter Period30Days on DataType
+| extend 
+    // Ensure DataType is populated regardless of join side
+    DataType = coalesce(DataType, DataType1, DataType2),
+    // Replace null values with 0.0 where no data exists for a period
+    Period90GB = coalesce(Period90GB, 0.0),
+    Period60GB = coalesce(Period60GB, 0.0),
+    Period30GB = coalesce(Period30GB, 0.0)
+| extend
+    // Calculate absolute differences in ingest volume (GB) between periods
+    Change60to30GB = Period30GB - Period60GB,
+    Change90to60GB = Period60GB - Period90GB,
+    Change90to30GB = Period30GB - Period90GB,
+    // Calculate percentage changes, avoiding divide-by-zero
+    ChangePct60to30 = iff(Period60GB > 0, round(((Period30GB - Period60GB) / Period60GB) * 100, 1), iff(Period30GB > 0, 100.0, 0.0)),
+    ChangePct90to60 = iff(Period90GB > 0, round(((Period60GB - Period90GB) / Period90GB) * 100, 1), iff(Period60GB > 0, 100.0, 0.0)),
+    ChangePct90to30 = iff(Period90GB > 0, round(((Period30GB - Period90GB) / Period90GB) * 100, 1), iff(Period30GB > 0, 100.0, 0.0))
+| extend
+    // Assign a trend classification based on how the values move across periods
+    TrendDirection = case(
+        Period30GB > Period60GB and Period60GB > Period90GB, "📈 Increasing",
+        Period30GB < Period60GB and Period60GB < Period90GB, "📉 Decreasing", 
+        Period30GB > Period60GB and Period60GB < Period90GB, "📊 Recovery",
+        Period30GB < Period60GB and Period60GB > Period90GB, "📋 Peak & Drop",
+        "🔄 Variable" // fallback for mixed trends
+    )
+| project 
+    // Rename columns for readability in the final output
+    ['Data Source'] = DataType,
+    ['60-90 Days Ago (GB)'] = Period90GB,
+    ['30-60 Days Ago (GB)'] = Period60GB,
+    ['Last 30 Days (GB)'] = Period30GB,
+    ['30d vs 60d Change (GB)'] = round(Change60to30GB, 2),
+    ['30d vs 60d Change %'] = ChangePct60to30,
+    ['60d vs 90d Change (GB)'] = round(Change90to60GB, 2),
+    ['60d vs 90d Change %'] = ChangePct90to60,
+    ['30d vs 90d Change (GB)'] = round(Change90to30GB, 2),
+    ['30d vs 90d Change %'] = ChangePct90to30,
+    ['Trend Pattern'] = TrendDirection,
+    // Apply Sentinel ingest cost ($5.16/GB in most regions) to show financial impact
+    ['30d vs 60d Cost Impact $'] = strcat('$', round(Change60to30GB * 5.16, 2)),
+    ['30d vs 90d Cost Impact $'] = strcat('$', round(Change90to30GB * 5.16, 2))
+| where ['Last 30 Days (GB)'] > 0 or ['30-60 Days Ago (GB)'] > 0 or ['60-90 Days Ago (GB)'] > 0
+    // Only show rows that had activity in at least one period
+| order by abs(['30d vs 90d Change (GB)']) desc
+    // Sort results by the biggest absolute change over 90 days
