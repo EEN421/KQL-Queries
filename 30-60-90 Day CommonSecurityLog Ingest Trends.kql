@@ -1,0 +1,73 @@
+// Compare CommonSecurityLog ingest trends by DeviceAction across 30, 60, and 90 day periods
+// This query analyzes security log volume changes to identify trends and cost impacts
+// Period 1: 60-90 days ago (oldest period)
+let Period90Days = CommonSecurityLog
+    | where TimeGenerated > ago(90d) and TimeGenerated <= ago(60d)  // Filter to 60-90 days ago
+    | extend DeviceAction = tostring(coalesce(DeviceAction, "Unknown"))  // Handle null DeviceAction values
+    | summarize Period90Count = count(), Period90GB = round(todouble(count() * 0.5) / 1024, 2) by DeviceAction;  // Count events and estimate GB (0.5KB per event)
+// Period 2: 30-60 days ago (middle period) 
+let Period60Days = CommonSecurityLog
+    | where TimeGenerated > ago(60d) and TimeGenerated <= ago(30d)  // Filter to 30-60 days ago
+    | extend DeviceAction = tostring(coalesce(DeviceAction, "Unknown"))  // Handle null DeviceAction values
+    | summarize Period60Count = count(), Period60GB = round(todouble(count() * 0.5) / 1024, 2) by DeviceAction;  // Count events and estimate GB
+// Period 3: Last 30 days (most recent period)
+let Period30Days = CommonSecurityLog
+    | where TimeGenerated > ago(30d)  // Filter to last 30 days
+    | extend DeviceAction = tostring(coalesce(DeviceAction, "Unknown"))  // Handle null DeviceAction values
+    | summarize Period30Count = count(), Period30GB = round(todouble(count() * 0.5) / 1024, 2) by DeviceAction;  // Count events and estimate GB
+// Join all three periods together to compare trends
+Period90Days
+| join kind=fullouter Period60Days on DeviceAction  // Full outer join to include all DeviceActions from both periods
+| join kind=fullouter Period30Days on DeviceAction  // Full outer join to include all DeviceActions from all periods
+| extend 
+    // Ensure we have a single DeviceAction column after joins
+    DeviceAction = coalesce(DeviceAction, DeviceAction1, DeviceAction2),
+    // Fill null values with 0 for calculations
+    Period90Count = coalesce(Period90Count, 0),
+    Period60Count = coalesce(Period60Count, 0),
+    Period30Count = coalesce(Period30Count, 0),
+    Period90GB = coalesce(Period90GB, 0.0),
+    Period60GB = coalesce(Period60GB, 0.0),
+    Period30GB = coalesce(Period30GB, 0.0)
+| extend
+    // Calculate absolute changes in event counts between periods
+    Change60to30Count = Period30Count - Period60Count,  // Change from 30-60d ago to last 30d
+    Change90to60Count = Period60Count - Period90Count,  // Change from 60-90d ago to 30-60d ago
+    Change90to30Count = Period30Count - Period90Count,  // Change from 60-90d ago to last 30d (total change)
+    // Calculate absolute changes in GB between periods
+    Change60to30GB = Period30GB - Period60GB,
+    Change90to60GB = Period60GB - Period90GB,
+    Change90to30GB = Period30GB - Period90GB,
+    // Calculate percentage changes (handle division by zero)
+    ChangePct60to30 = iff(Period60Count > 0, round(((todouble(Period30Count) - todouble(Period60Count)) / todouble(Period60Count)) * 100, 1), iff(Period30Count > 0, 100.0, 0.0)),
+    ChangePct90to60 = iff(Period90Count > 0, round(((todouble(Period60Count) - todouble(Period90Count)) / todouble(Period90Count)) * 100, 1), iff(Period60Count > 0, 100.0, 0.0)),
+    ChangePct90to30 = iff(Period90Count > 0, round(((todouble(Period30Count) - todouble(Period90Count)) / todouble(Period90Count)) * 100, 1), iff(Period30Count > 0, 100.0, 0.0))
+| extend
+    // Classify the trend pattern based on volume changes across periods
+    TrendDirection = case(
+        Period30Count > Period60Count and Period60Count > Period90Count, "Increasing",        // Consistent growth
+        Period30Count < Period60Count and Period60Count < Period90Count, "Decreasing",        // Consistent decline
+        Period30Count > Period60Count and Period60Count < Period90Count, "Recovery",          // Dipped then recovered
+        Period30Count < Period60Count and Period60Count > Period90Count, "Peak and Drop",     // Peaked then dropped
+        "Variable"  // All other patterns
+    )
+| project 
+    // Output columns with descriptive names
+    DeviceAction = DeviceAction,                    // The security device action type
+    Period90DaysCount = Period90Count,              // Event count 60-90 days ago
+    Period60DaysCount = Period60Count,              // Event count 30-60 days ago  
+    Period30DaysCount = Period30Count,              // Event count last 30 days
+    Period90DaysGB = Period90GB,                    // Estimated GB 60-90 days ago
+    Period60DaysGB = Period60GB,                    // Estimated GB 30-60 days ago
+    Period30DaysGB = Period30GB,                    // Estimated GB last 30 days
+    Change30vs60Count = Change60to30Count,          // Count change from 30-60d to last 30d
+    Change30vs60Pct = ChangePct60to30,             // Percentage change from 30-60d to last 30d
+    Change60vs90Count = Change90to60Count,          // Count change from 60-90d to 30-60d
+    Change60vs90Pct = ChangePct90to60,             // Percentage change from 60-90d to 30-60d
+    Change30vs90Count = Change90to30Count,          // Total count change from 60-90d to last 30d
+    Change30vs90Pct = ChangePct90to30,             // Total percentage change from 60-90d to last 30d
+    TrendPattern = TrendDirection,                  // Classified trend pattern
+    CostImpact30vs60 = strcat("$", round(Change60to30GB * 5.16, 2)),    // Cost impact of recent change ($5.16/GB)
+    CostImpact30vs90 = strcat("$", round(Change90to30GB * 5.16, 2))     // Cost impact of total change ($5.16/GB)
+| where Period30DaysCount > 0 or Period60DaysCount > 0 or Period90DaysCount > 0  // Only show DeviceActions with activity
+| order by abs(Change30vs90Count) desc  // Sort by largest absolute change over 90 days
