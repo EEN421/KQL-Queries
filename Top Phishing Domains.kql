@@ -1,0 +1,37 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// Identifies top phishing sender domains and categorizes severity based on volume
+
+EmailEvents
+| where ThreatTypes has "Phish"
+| summarize PhishCount = count() by SenderFromDomain
+// Assign severity level indicators based on PhishCount
+| extend SeverityIndicator = case(
+                                 PhishCount >= 1000,
+                                 "🔥 Extreme Threat Domain",
+                                 PhishCount >= 500,
+                                 "🔴 Critical Threat Domain",
+                                 PhishCount >= 200,
+                                 "🟠 Major Threat Domain",
+                                 PhishCount >= 100,
+                                 "🟡 Moderate Threat Domain",
+                                 "🟢 Low Threat Domain"
+                             )
+// Apply color coding to PhishCount
+| extend CountColor = case(
+                          PhishCount >= 1000,
+                          "🔥",
+                          PhishCount >= 500,
+                          "🔴",
+                          PhishCount >= 200,
+                          "🟠",
+                          PhishCount >= 100,
+                          "🟡",
+                          "🟢"
+                      )
+// Sort by the highest volume of phishing emails sent from a domain
+| top 10 by PhishCount desc
+// Improve column naming for readability
+| project
+    ["Sender Domain"] = SenderFromDomain, 
+    ["Phishing Emails Sent"] = strcat(CountColor, " ", PhishCount),
+    ["Severity"] = SeverityIndicator
