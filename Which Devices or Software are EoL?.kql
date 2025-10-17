@@ -1,0 +1,7 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+// Devices that have at least one end-of-support (EOL/EOS) title or version
+
+DeviceTvmSoftwareInventory
+| where DeviceName != ""
+| where isnotempty(EndOfSupportDate) and EndOfSupportDate <= now()
+| summarize count() by SoftwareName, DeviceName
