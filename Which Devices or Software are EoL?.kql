@@ -6,3 +6,13 @@ DeviceTvmSoftwareInventory
 | where isnotempty(EndOfSupportDate) and EndOfSupportDate <= now()
 | project DeviceName, SoftwareName, SoftwareVersion, SoftwareVendor, EndOfSupportDate
 | order by DeviceName asc, SoftwareName asc
+
+DeviceTvmSoftwareInventory
+| where isnotempty(DeviceName)
+| where isnotempty(EndOfSupportDate) and EndOfSupportDate <= now()
+| summarize 
+    EOLSoftwareCount = count(),
+    EOLSoftwareList = make_set(SoftwareName, 100),
+    OldestEOLDate = min(EndOfSupportDate)
+  by DeviceName
+| order by EOLSoftwareCount desc
