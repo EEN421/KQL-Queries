@@ -2,6 +2,7 @@
 // Devices that have at least one end-of-support (EOL/EOS) title or version
 
 DeviceTvmSoftwareInventory
-| where DeviceName != ""
+| where isnotempty(DeviceName)
 | where isnotempty(EndOfSupportDate) and EndOfSupportDate <= now()
-| summarize count() by SoftwareName, DeviceName
+| project DeviceName, SoftwareName, SoftwareVersion, SoftwareVendor, EndOfSupportDate
+| order by DeviceName asc, SoftwareName asc
