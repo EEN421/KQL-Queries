@@ -1,0 +1,12 @@
+SecurityEvent
+| where TimeGenerated > ago(30d)  // Add time filter to prevent timeout
+| where EventID in (4624, 4634, 4778, 4779)
+| extend Action = case(
+    EventID == 4624, "Logon",
+    EventID == 4634, "Logoff",
+    EventID == 4778, "RDP Reconnect",
+    EventID == 4779, "RDP Disconnect",
+    "Unknown")  // <-- Add this default value
+| project TimeGenerated, SourceComputerId, TargetUserName, Activity
+| where TargetUserName !contains "SYSTEM"
+| order by TimeGenerated desc
