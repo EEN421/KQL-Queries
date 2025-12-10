@@ -23,4 +23,6 @@ Usage                                                                           
 | where TimeGenerated > ago(90d)                                                        // <--Query the last 90 days
 | where IsBillable == true                                                              // <--Only include 'billable' data
 | summarize TotalVolumeGB = round(sum(Quantity) / 1024, 2) by bin(TimeGenerated, 1d)    // <--Chop it up into GB / Day
-| extend  cost=strcat('$', round(TotalVolumeGB*4.30, 2))                                // <--Round to 2 decimal places, calculate the cost, and prepend '$'
+| extend  cost=strcat('$', round(TotalVolumeGB*4.30, 2), ' / Day')          // <--Format daily cost as a readable string by prepending '$', rounding to 2 decimals, and adding '/ Day'
+| extend TotalVolumeGB = strcat(TotalVolumeGB, 'GB / Day')                  // <--Convert GB value to a display string by appending 'GB / Day' for clearer, human-friendly output
+
