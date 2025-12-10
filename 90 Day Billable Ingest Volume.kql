@@ -14,7 +14,7 @@ Usage                                                                           
 Usage                                                                                             // <--Query the Usage table
 | where TimeGenerated > ago(90d)                                                                  // <--Query the last 90 days
 | where IsBillable == true                                                                        // <--Only include 'billable' data
-| summarize TotalVolumeGB = round(sum(Quantity) / 1024, 2) by StartTime=bin(TimeGenerated, 1d)    // <--Group data into 1-day buckets and convert total ingested quantity into GB
+| summarize TotalVolumeGB = round(sum(Quantity) / 1024, 2) by (TimeGenerated, 1d)    // <--Group data into 1-day buckets and convert total ingested quantity into GB
 | extend CostUSD = round(TotalVolumeGB * 4.30, 2)                                   // <--Calculate daily cost by multiplying GB/day by your region’s $/GB rate and rounding to 2 decimals
 
 //Query 3: The below query will return the total billable GB and incurred cost per day. 
