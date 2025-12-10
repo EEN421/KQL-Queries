@@ -9,8 +9,17 @@ Usage                                                                           
 | render columnchart                                                                // <--Graph the results
 
 //The below query will return the total billable GB and incurred cost per day. 
+//Because the cost is made into a string with strcat, it's not great for graphs. 
 Usage                                                                               // <--Query the Usage table
 | where TimeGenerated > ago(90d)                                                    // <--Query the last 90 days
 | where IsBillable == true                                                          // <--Only include 'billable' data
 | summarize TotalVolumeGB = round(sum(Quantity) / 1024, 2) by bin(StartTime, 1d)    // <--Chop it up into GB / Day
 | extend  cost=strcat('$', round(TotalVolumeGB*4.30, 2))                            // <--Round to 2 decimal places, calculate the cost, and prepend '$'
+
+//This query is great for graphing out cost per day because CostUSD is float and not a string.
+//You lose the '$' and '/day' formatting in the number column this way.
+Usage                                                                                             // <--Query the Usage table
+| where TimeGenerated > ago(90d)                                                                  // <--Query the last 90 days
+| where IsBillable == true                                                                        // <--Only include 'billable' data
+| summarize TotalVolumeGB = round(sum(Quantity) / 1024, 2) by StartTime=bin(TimeGenerated, 1d)    // <--Group data into 1-day buckets and convert total ingested quantity into GB
+| extend CostUSD = round(TotalVolumeGB * 4.30, 2)                                   // <--Calculate daily cost by multiplying GB/day by your region’s $/GB rate and rounding to 2 decimals
