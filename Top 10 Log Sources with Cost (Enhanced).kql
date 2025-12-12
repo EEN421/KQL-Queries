@@ -1,6 +1,19 @@
 // Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
 // Top Log Sources with Cost (Enhanced with Colors & Emojis)
 
+// Original Query
+let PricePerGB = 5.16;   // <-- Replace with your region's actual Sentinel price per GB
+Usage
+| where TimeGenerated > ago(30d)
+| where IsBillable == true
+| summarize TotalGiB = round(sum(Quantity) / 1024.0, 2) by DataType
+| extend CostUSD = round(TotalGiB * PricePerGB, 2)
+| top 10 by CostUSD desc
+| order by CostUSD desc
+
+=========================================================================================
+
+// Enhanced! 
 Usage
 | where IsBillable == true
 | summarize GB= round(sum(Quantity) / 1000, 2) by DataType
