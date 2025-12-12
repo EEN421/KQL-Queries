@@ -2,24 +2,20 @@
 // Top Security Log Reasons with Cost (Enhanced with Colors & Emojis)
 
 CommonSecurityLog
+| where TimeGenerated > ago(90d)
 | where isnotempty(Reason) and Reason != "N/A"
-| extend LogSizeBytes = strlen(tostring(pack_all()))  // Estimate log size per record
-| summarize TotalEvents = count(), TotalGB = sum(LogSizeBytes) / (1024 * 1024 * 1024) by Reason, LogSeverity
+| summarize TotalEvents = count(), 
+            TotalBytes = sum(_BilledSize) 
+            by Reason, LogSeverity
+| extend TotalGB = round(TotalBytes / (1024.0 * 1024.0 * 1024.0), 4)
 | extend RawCost = round(TotalGB * 5.16, 2)
-| sort by TotalEvents desc
 | extend CostLevel = case(
-                         RawCost >= 1000,
-                         '🤑🤑🤑🤑🤑',  // Most Expensive
-                         RawCost >= 750,
-                         '💰💰💰💰',
-                         RawCost >= 500,
-                         '💰💰💰',
-                         RawCost >= 250,
-                         '💰💰',
-                         RawCost >= 100,
-                         '💰',          // Least Expensive
-                         '💸'                             // Fallback
-                     )
+                         RawCost >= 1000, '🤑🤑🤑🤑🤑',
+                         RawCost >= 750, '💰💰💰💰',
+                         RawCost >= 500, '💰💰💰',
+                         RawCost >= 250, '💰💰',
+                         RawCost >= 100, '💰',
+                         '💸')
 | extend IngestCost = strcat('$', tostring(RawCost), ' ', CostLevel)
 | project Reason, LogSeverity, TotalEvents, TotalGB, IngestCost
 | top 10 by TotalEvents desc
