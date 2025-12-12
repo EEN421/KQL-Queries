@@ -1,6 +1,20 @@
 // Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
 // Top Security Log Reasons with Cost (Enhanced with Colors & Emojis)
 
+// Original Query
+let PricePerGB = 5.16;   // <-- Match this to the same rate you used in Query 1
+CommonSecurityLog
+| where TimeGenerated > ago(30d)
+| where _IsBillable == true
+| summarize TotalGiB = round(sum(_BilledSize) / 1024.0 / 1024.0 / 1024.0, 2)
+          by DeviceVendor, DeviceProduct, LogSeverity
+| extend CostUSD = round(TotalGiB * PricePerGB, 2)
+| top 10 by CostUSD desc
+| order by CostUSD desc
+
+===============================================================================
+
+// Enhanced!
 CommonSecurityLog
 | where TimeGenerated > ago(90d)
 | where isnotempty(Reason) and Reason != "N/A"
