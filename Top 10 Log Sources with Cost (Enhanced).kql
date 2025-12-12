@@ -15,9 +15,10 @@ Usage
 
 // Enhanced! 
 Usage
+| where TimeGenerated > ago(30d)
 | where IsBillable == true
-| summarize GB= round(sum(Quantity) / 1000, 2) by DataType
-| extend Cost=round(GB * 5.16, 2)
+| summarize GiB= round(sum(Quantity) / 1024, 2) by DataType
+| extend Cost=round(GiB * 5.16, 2)
 | sort by Cost desc
 | extend CostLevel = case(
                          Cost >= 1000,
@@ -29,9 +30,9 @@ Usage
                          Cost >= 250,
                          '💰💰',
                          Cost >= 100,
-                         '💰',          // Least Expensive
-                         '💸'                         // Fallback
+                         '💰',           // Least Expensive
+                         '💸'            // Fallback
                      )
 | extend Cost=strcat('$', Cost, ' ', CostLevel)
-| project DataType, GB, Cost
+| project DataType, GiB, Cost
 | take 10
