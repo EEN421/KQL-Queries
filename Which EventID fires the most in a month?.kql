@@ -4,5 +4,6 @@
 SecurityEvent                       // <--Define the table to query
 | where TimeGenerated > ago(30d)    // <--Query the last 30 days
 | summarize count() by EventID      // <--Return number of hits per EventID
+| sort by count_ desc               // <--Bring heaviest hitters to the top
 | take 10                           // <--Take the top 10
 | render columnchart                // <--Helps visualize which EventIDs are the heavy hitters
