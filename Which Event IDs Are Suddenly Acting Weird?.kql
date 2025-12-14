@@ -1,0 +1,27 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | 
+// GitHub: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+
+// This query helps answer a common SOC question: which Event IDs have recently spiked
+// well beyond their historical baseline and may warrant investigation.
+// If you spot unexpected deviations and need help determining whether it’s signal,
+// noise, or misconfiguration, check out the KQL Detective series at hanley.cloud
+
+let BaselineWindow = 90d;
+let RecentWindow = 30d;
+let ThresholdMultiplier = 2.0;
+let Baseline =
+    SecurityEvent
+    | where TimeGenerated > ago(BaselineWindow)
+    | summarize DailyCount = count() by EventID, Day = bin(TimeGenerated, 1d)
+    | summarize AvgDailyCount = round(avg(DailyCount),2) by EventID;
+let Recent =
+    SecurityEvent
+    | where TimeGenerated > ago(RecentWindow)
+    | summarize RecentCount = count() by EventID;
+Baseline
+| join kind=inner Recent on EventID
+| extend DeviationRatio = round(RecentCount / AvgDailyCount, 2)
+| where DeviationRatio >= ThresholdMultiplier
+| project EventID, AvgDailyCount, RecentCount, DeviationRatio
+| take 10
+| sort by DeviationRatio desc
