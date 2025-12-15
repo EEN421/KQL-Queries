@@ -1,36 +1,83 @@
-let PriorPeriod = toscalar(
-    Usage
-    | where TimeGenerated > ago(60d) and TimeGenerated <= ago(30d)
-    | where IsBillable == true
-    | summarize min(TimeGenerated)
-);
-let CurrentPeriod = toscalar(
-    Usage
-    | where TimeGenerated > ago(30d)
-    | where IsBillable == true
-    | summarize max(TimeGenerated)
-);
-let PriorData = Usage
-    | where TimeGenerated between (PriorPeriod .. ago(30d))
-    | where IsBillable == true
-    | summarize PriorGB = round(todouble(sum(Quantity))/1024, 2) by DataType;
-let CurrentData = Usage
-    | where TimeGenerated > ago(30d)
-    | where IsBillable == true
-    | summarize CurrentGB = round(todouble(sum(Quantity))/1024, 2) by DataType;
+// -------------------------------
+// Configuration / Tunables
+// -------------------------------
+// Cost per GB for Microsoft Sentinel ingest
+// (Update this to match your region’s pricing)
+let CostPerGB = 4.30;
+// Define the end of the current reporting window (now)
+let CurrentEnd = now();
+// Define the start of the current 30-day window
+let CurrentStart = CurrentEnd - 30d;
+// Define the start of the prior 30-day window
+let PriorStart = CurrentEnd - 60d;
+// Define the end of the prior window (exactly where current begins)
+let PriorEnd = CurrentStart;
+// -------------------------------
+// Prior 30-Day Usage (Days -60 → -30)
+// -------------------------------
+let PriorData =
+    Usage                                   // Query the Usage (billing) table
+    | where IsBillable == true              // Only include billable ingest
+    | where TimeGenerated >= PriorStart     // Start of prior 30-day window
+          and TimeGenerated < PriorEnd      // End of prior window (exclusive)
+    | summarize                             // Aggregate ingest volume
+        PriorGB = round(
+            todouble(sum(Quantity)) / 1024, // Convert MB → GB
+            2                               // Round to 2 decimal places
+        )
+        by DataType;                        // Group by log table / data source
+// -------------------------------
+// Current 30-Day Usage (Days -30 → Now)
+// -------------------------------
+let CurrentData =
+    Usage                                   // Query the Usage (billing) table
+    | where IsBillable == true              // Only include billable ingest
+    | where TimeGenerated >= CurrentStart   // Start of current 30-day window
+          and TimeGenerated <= CurrentEnd   // End of window (now)
+    | summarize                             // Aggregate ingest volume
+        CurrentGB = round(
+            todouble(sum(Quantity)) / 1024, // Convert MB → GB
+            2                               // Round to 2 decimal places
+        )
+        by DataType;                        // Group by log table / data source
+// -------------------------------
+// Comparison & Delta Analysis
+// -------------------------------
 PriorData
-| join kind=fullouter CurrentData on DataType
-| extend 
-    DataType = coalesce(DataType, DataType1),
-    PriorGB = coalesce(PriorGB, 0.0),
-    CurrentGB = coalesce(CurrentGB, 0.0),
-    ChangeGB = coalesce(CurrentGB - PriorGB, 0.0)
-| project 
-    ['Data Source'] = DataType,
-    ['Previous 30 Days (GB)'] = PriorGB,
-    ['Current 30 Days (GB)'] = CurrentGB,
-    ['Change (GB)'] = round(CurrentGB - PriorGB, 2),
-    ['Change %'] = iif(PriorGB > 0, round(((CurrentGB - PriorGB) / PriorGB) * 100, 1), 100.0),
-    ['Change $'] = strcat('$', round(ChangeGB * {CostPerGB}, 2))
-| where ['Current 30 Days (GB)'] > 0 or ['Previous 30 Days (GB)'] > 0
-| top 10 by abs(['Change (GB)']) desc
+| join kind=fullouter                      // Keep all data sources from both periods
+    CurrentData
+    on DataType                            // Join on table / data source name
+| extend
+    PriorGB   = coalesce(PriorGB, 0.0),    // Treat missing prior data as 0 GB
+    CurrentGB = coalesce(CurrentGB, 0.0),  // Treat missing current data as 0 GB
+    ChangeGB  = CurrentGB - PriorGB        // Calculate absolute GB change
+| project
+    ['Data Source']           = DataType,  // Friendly column name for output
+    ['Previous 30 Days (GB)'] = PriorGB,   // Prior window ingest
+    ['Current 30 Days (GB)']  = CurrentGB, // Current window ingest
+    ['Change (GB)']           = round(     // Net change in GB
+        ChangeGB,
+        2
+    ),
+    ['Change %'] =
+        iif(                               
+            PriorGB > 0,                   // Only calculate % if prior data exists
+            round(
+                (ChangeGB / PriorGB) * 100,// Percentage change
+                1
+            ),
+            real(null)                     // Avoid misleading % when prior = 0
+        ),
+    ['Change $'] =
+        strcat(
+            '$',
+            round(
+                ChangeGB * CostPerGB,      // Convert GB delta → estimated cost delta
+                2
+            )
+        )
+| where                                   // Remove rows with no activity in either period
+    ['Current 30 Days (GB)'] > 0
+    or ['Previous 30 Days (GB)'] > 0
+| top 10                                  // Focus on the biggest movers
+    by abs(['Change (GB)']) desc           // Rank by absolute GB change
