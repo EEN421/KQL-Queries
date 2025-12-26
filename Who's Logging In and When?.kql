@@ -1,3 +1,7 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+
+//This query is designed to track RDP logon/logoff activity for establishing a baseline or investigating suspicious logon activity on-prem
+
 SecurityEvent
 | where TimeGenerated > ago(30d)
 | where EventID in (4624, 4634, 4778, 4779)
@@ -12,3 +16,20 @@ SecurityEvent
     Activity,
     User = coalesce(TargetUserName, Account)
 | order by TimeGenerated desc
+
+======================================================================
+
+//Logins per Day per User — Great to graph out your heaviest hitters and establishing a baseline
+
+SecurityEvent
+| where TimeGenerated > ago(30d)
+| where EventID == 4624  // Focus on successful logons only
+| where AccountType != "Machine"
+| where Account !has "SYSTEM" and Account !endswith "$"
+| where LogonType == 10  // RDP only
+| extend User = coalesce(TargetUserName, Account)
+| summarize LoginCount = count() by 
+    Day = bin(TimeGenerated, 1d),
+    User
+| order by Day desc, LoginCount desc
+| render timechart 
