@@ -1,13 +1,24 @@
 SecurityEvent
-| where TimeGenerated > ago(30d)  // Add time filter to prevent timeout
+| where TimeGenerated > ago(30d)
 | where EventID in (4624, 4634, 4778, 4779)
-| extend Action = case(
-    EventID == 4624, "Logon",
-    EventID == 4634, "Logoff",
-    EventID == 4778, "RDP Reconnect",
-    EventID == 4779, "RDP Disconnect",
-    "Unknown")  // <-- Add this default value
-| project TimeGenerated, SourceComputerId, TargetUserName, Activity
-| where TargetUserName !contains "SYSTEM"
-| where TargetUserName !contains "$"
+// Early filtering before parsing
+| where AccountType != "Machine"  // More efficient than string matching
+| where Account !has "SYSTEM" and Account !endswith "$"
+| extend EventData = parse_xml(EventData)
+| extend LogonType = toint(EventData.EventData.Data[8]["#text"])  // More reliable parsing
+| extend IpAddress = tostring(EventData.EventData.Data[18]["#text"])
+| extend WorkstationName = tostring(EventData.EventData.Data[11]["#text"])
+| extend LogonID = tostring(EventData.EventData.Data[7]["#text"])  // For session correlation
+// Filter to RDP only for logons, keep all logoff/reconnect/disconnect
+| where EventID != 4624 or LogonType == 10
+| project 
+    TimeGenerated,
+    Computer,
+    SourceComputerId,
+    Activity,
+    User = coalesce(TargetUserName, Account),
+    IpAddress,
+    WorkstationName,
+    LogonID,  // Useful for correlating sessions
+    LogonType
 | order by TimeGenerated desc
