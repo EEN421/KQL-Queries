@@ -9,4 +9,5 @@ SecurityEvent
     "Unknown")  // <-- Add this default value
 | project TimeGenerated, SourceComputerId, TargetUserName, Activity
 | where TargetUserName !contains "SYSTEM"
+| where TargetUserName !contains "$"
 | order by TimeGenerated desc
