@@ -4,21 +4,11 @@ SecurityEvent
 // Early filtering before parsing
 | where AccountType != "Machine"  // More efficient than string matching
 | where Account !has "SYSTEM" and Account !endswith "$"
-| extend EventData = parse_xml(EventData)
-| extend LogonType = toint(EventData.EventData.Data[8]["#text"])  // More reliable parsing
-| extend IpAddress = tostring(EventData.EventData.Data[18]["#text"])
-| extend WorkstationName = tostring(EventData.EventData.Data[11]["#text"])
-| extend LogonID = tostring(EventData.EventData.Data[7]["#text"])  // For session correlation
 // Filter to RDP only for logons, keep all logoff/reconnect/disconnect
 | where EventID != 4624 or LogonType == 10
 | project 
     TimeGenerated,
-    Computer,
-    SourceComputerId,
+    DomainController = Computer,
     Activity,
-    User = coalesce(TargetUserName, Account),
-    IpAddress,
-    WorkstationName,
-    LogonID,  // Useful for correlating sessions
-    LogonType
+    User = coalesce(TargetUserName, Account)
 | order by TimeGenerated desc
