@@ -1,0 +1,126 @@
+// Hunt for actions performed by blank/empty/null accounts
+// Covers: Entra ID Sign-ins, Audit Logs, Azure Activity, Defender for Endpoint
+// ── 1. Entra ID Sign-In Logs ──────────────────────────────────────────────────
+let EntraSignIns = SigninLogs
+| where TimeGenerated > ago(7d)
+| where isnull(UserPrincipalName) or isempty(UserPrincipalName) or UserPrincipalName in ("", "N/A", "unknown", "-")
+       or isnull(UserDisplayName) or isempty(UserDisplayName) or UserDisplayName in ("", "N/A", "unknown", "-")
+| project
+    TimeGenerated,
+    Source          = "EntraID - SigninLogs",
+    AccountUPN      = UserPrincipalName,
+    AccountDisplay  = UserDisplayName,
+    Action          = "Sign-In",
+    Result          = tostring(ResultType),
+    ResultDesc      = ResultDescription,
+    AppDisplayName,
+    IPAddress,
+    Location        = tostring(LocationDetails),
+    DeviceDetail    = tostring(DeviceDetail),
+    ConditionalAccessStatus,
+    CorrelationId;
+// ── 2. Entra ID Audit Logs ───────────────────────────────────────────────────
+let EntraAudit = AuditLogs
+| where TimeGenerated > ago(7d)
+| extend InitiatedUPN = tostring(InitiatedBy.user.userPrincipalName)
+| extend InitiatedApp = tostring(InitiatedBy.app.displayName)
+| where (isnull(InitiatedUPN) or isempty(InitiatedUPN) or InitiatedUPN in ("", "N/A", "unknown", "-"))
+      and (isnull(InitiatedApp) or isempty(InitiatedApp) or InitiatedApp in ("", "N/A", "unknown", "-"))
+| project
+    TimeGenerated,
+    Source          = "EntraID - AuditLogs",
+    AccountUPN      = InitiatedUPN,
+    AccountDisplay  = InitiatedApp,
+    Action          = OperationName,
+    Result          = Result,
+    ResultDesc      = ResultDescription,
+    AppDisplayName  = InitiatedApp,
+    IPAddress       = tostring(InitiatedBy.user.ipAddress),
+    Location        = "",
+    DeviceDetail    = "",
+    ConditionalAccessStatus = "",
+    CorrelationId;
+
+// ── 3. Azure Activity Logs (Control Plane) ───────────────────────────────────
+let AzureActivity_ = AzureActivity
+| where TimeGenerated > ago(7d)
+| where isnull(Caller) or isempty(Caller) or Caller in ("", "N/A", "unknown", "-")
+| project
+    TimeGenerated,
+    Source          = "AzureActivity",
+    AccountUPN      = Caller,
+    AccountDisplay  = Caller,
+    Action          = OperationNameValue,
+    Result          = ActivityStatusValue,
+    ResultDesc      = tostring(Properties),
+    AppDisplayName  = "",
+    IPAddress       = CallerIpAddress,
+    Location        = "",
+    DeviceDetail    = "",
+    ConditionalAccessStatus = "",
+    CorrelationId;
+
+// ── 4. Microsoft Defender for Endpoint – Device Events ───────────────────────
+let DefenderEvents = DeviceEvents
+| where TimeGenerated > ago(7d)
+| where (isnull(AccountName) or isempty(AccountName) or AccountName in ("", "N/A", "unknown", "-"))
+       or (isnull(AccountDomain) or isempty(AccountDomain) or AccountDomain in ("", "N/A", "unknown", "-"))
+| where isnotempty(ActionType)
+| project
+    TimeGenerated,
+    Source          = "MDE - DeviceEvents",
+    AccountUPN      = strcat(AccountDomain, "\\", AccountName),
+    AccountDisplay  = AccountName,
+    Action          = ActionType,
+    Result          = "",
+    ResultDesc      = tostring(AdditionalFields),
+    AppDisplayName  = InitiatingProcessFileName,
+    IPAddress       = RemoteIP,
+    Location        = "",
+    DeviceDetail    = DeviceName,
+    ConditionalAccessStatus = "",
+    CorrelationId   = "";
+
+// ── 5. Microsoft Defender for Endpoint – Logon Events ────────────────────────
+let DefenderLogons = DeviceLogonEvents
+| where TimeGenerated > ago(7d)
+| where (isnull(AccountName) or isempty(AccountName) or AccountName in ("", "N/A", "unknown", "-"))
+       or (isnull(AccountSid) or isempty(AccountSid) or AccountSid in ("", "N/A", "unknown", "-"))
+| project
+    TimeGenerated,
+    Source          = "MDE - DeviceLogonEvents",
+    AccountUPN      = strcat(AccountDomain, "\\", AccountName),
+    AccountDisplay  = AccountName,
+    Action          = strcat("Logon (", LogonType, ")"),
+    Result          = ActionType,
+    ResultDesc      = tostring(AdditionalFields),
+    AppDisplayName  = InitiatingProcessFileName,
+    IPAddress       = RemoteIP,
+    Location        = "",
+    DeviceDetail    = DeviceName,
+    ConditionalAccessStatus = "",
+    CorrelationId   = "";
+// ── Union + Summarize ─────────────────────────────────────────────────────────
+EntraSignIns
+| union isfuzzy=true EntraAudit, AzureActivity_, DefenderEvents, DefenderLogons
+| summarize
+    EventCount      = count(),
+    FirstSeen       = min(TimeGenerated),
+    LastSeen        = max(TimeGenerated),
+    Actions         = make_set(Action, 25),
+    Results         = make_set(Result, 10),
+    IPAddresses     = make_set(IPAddress, 10),
+    Devices         = make_set(DeviceDetail, 10)
+  by Source, AccountUPN, AccountDisplay
+| extend BlankReason = case(
+    isnull(AccountUPN) or AccountUPN == "",   "Null/Empty UPN",
+    AccountUPN == "N/A",                       "Explicit N/A",
+    AccountUPN == "unknown",                   "Unknown string",
+    AccountUPN startswith "\\",                "Domain only - no username",
+                                               "Other blank pattern"
+  )
+| project-reorder
+    Source, BlankReason, AccountUPN, AccountDisplay,
+    EventCount, FirstSeen, LastSeen,
+    Actions, Results, IPAddresses, Devices
+| sort by EventCount desc
