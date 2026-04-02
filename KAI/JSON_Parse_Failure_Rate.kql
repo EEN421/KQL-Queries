@@ -1,0 +1,9 @@
+YourCustomTable_CL
+| where TimeGenerated > ago(7d)
+| extend Parsed = parse_json(RawData)
+| summarize
+    Total=count(),
+    ParseFailed=countif(isnull(Parsed))
+  by bin(TimeGenerated, 1h), Computer
+| extend ParseFailPct = todouble(ParseFailed) * 100.0 / Total
+| order by TimeGenerated desc
