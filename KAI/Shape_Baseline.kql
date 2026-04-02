@@ -1,0 +1,22 @@
+let baseline =
+    CommonSecurityLog
+    | where TimeGenerated between (ago(14d) .. ago(1d))
+    | summarize
+        BaselineMsgLen=avg(strlen(Message)),
+        BaselineNullSourceIP=todouble(countif(isempty(SourceIP))) / count(),
+        BaselineNullDestIP=todouble(countif(isempty(DestinationIP))) / count()
+      by DeviceVendor, DeviceProduct;
+let current =
+    CommonSecurityLog
+    | where TimeGenerated > ago(24h)
+    | summarize
+        CurrentMsgLen=avg(strlen(Message)),
+        CurrentNullSourceIP=todouble(countif(isempty(SourceIP))) / count(),
+        CurrentNullDestIP=todouble(countif(isempty(DestinationIP))) / count()
+      by DeviceVendor, DeviceProduct;
+baseline
+| join kind=inner current on DeviceVendor, DeviceProduct
+| extend MsgLenDeltaPct = 100.0 * (CurrentMsgLen - BaselineMsgLen) / BaselineMsgLen
+| extend SourceIPNullDelta = CurrentNullSourceIP - BaselineNullSourceIP
+| extend DestIPNullDelta = CurrentNullDestIP - BaselineNullDestIP
+| where abs(MsgLenDeltaPct) > 30 or SourceIPNullDelta > 0.1 or DestIPNullDelta > 0.1
