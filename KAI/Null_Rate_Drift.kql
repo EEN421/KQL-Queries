@@ -1,0 +1,12 @@
+CommonSecurityLog
+| where TimeGenerated > ago(7d)
+| summarize
+    Total=count(),
+    MissingDeviceAction=countif(isempty(DeviceAction)),
+    MissingSourceIP=countif(isempty(SourceIP)),
+    MissingDestinationIP=countif(isempty(DestinationIP)),
+    MissingMessage=countif(isempty(Message))
+  by bin(TimeGenerated, 1h), DeviceVendor, DeviceProduct
+| extend DeviceActionNullPct = todouble(MissingDeviceAction) * 100.0 / Total
+| extend SourceIPNullPct = todouble(MissingSourceIP) * 100.0 / Total
+| order by TimeGenerated desc
