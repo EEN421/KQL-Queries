@@ -1,0 +1,9 @@
+let activeRules = SentinelHealth
+| where TimeGenerated >= ago(90d)
+| where SentinelResourceType == "Analytics Rule" and Status == "Success"
+| summarize by SentinelResourceName;
+let alertingRules = SecurityAlert
+| where TimeGenerated >= ago(90d)
+| distinct AlertName;
+activeRules
+| where SentinelResourceName !in (alertingRules)
