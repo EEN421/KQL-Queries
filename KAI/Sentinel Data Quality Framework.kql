@@ -1,0 +1,423 @@
+// =============================================================
+// Context-Aware Sentinel Data Quality Framework
+// Last 24 Hours
+//
+// Output columns
+//   Status         - severity state for triage
+//   TableName      - source table
+//   FieldName      - column being checked
+//   CheckType      - Null/Empty, Placeholder, InvalidFormat, InvalidRange, Inconsistent, Suspicious
+//   IssueType      - higher-level category for triage
+//   Reason         - human-readable explanation
+//   Severity       - High / Medium / Low
+//   AffectedCount  - records that failed the check
+//   TotalRecords   - total records in scope
+//   AffectedPct    - percent affected
+//   DrilldownQuery - sample query to pull impacted events
+// =============================================================
+let _time = 24h;
+// ---------------------------
+// Reusable helpers
+// ---------------------------
+let PlaceholderValues = dynamic(["unknown","n/a","na","null","undefined","none","-","test"]);
+let ValidSyslogSeverities = dynamic(["emerg","alert","crit","err","warning","notice","info","debug"]);
+let ValidSyslogFacilities = dynamic([
+    "kern","user","mail","daemon","auth","syslog","lpr",
+    "news","uucp","cron","authpriv","ftp",
+    "local0","local1","local2","local3","local4","local5","local6","local7"
+]);
+let ValidOSPlatforms = dynamic(["Windows","Linux","macOS","iOS","Android","Unknown","ChromeOS"]);
+let ValidOnboardingStatus = dynamic([
+    "Onboarded","CanBeOnboarded","Insufficient",
+    "InsufficientInfo","NoStatus","NotOnboarded"
+]);
+let ValidWindowsLogonTypes = dynamic([2,3,4,5,7,8,9,10,11,12,13]);
+// =============================================================
+// 1) SecurityEvent
+// =============================================================
+let SE_Base =
+    SecurityEvent
+    | where TimeGenerated > ago(_time)
+    | extend
+        i_ComputerMissing      = isempty(Computer),
+        i_AccountMissing       = isempty(Account),
+        i_EventIDMissing       = isnull(EventID),
+        i_SubjectUserMissing   = EventID in (4624,4625,4648,4672,4688) and isempty(SubjectUserName),
+        i_TargetUserMissing    = EventID in (4624,4625,4648) and isempty(TargetUserName),
+        i_EventIDRange         = isnotnull(EventID) and not(EventID between (0 .. 65535)),
+        i_AccountPlaceholder   = isnotempty(Account) and tolower(trim(@" ", tostring(Account))) in (PlaceholderValues),
+        i_AccountMalformed     = isnotempty(Account)
+                                 and not(Account contains "\\")
+                                 and not(Account contains "@")
+                                 and Account !in ("SYSTEM","LOCAL SERVICE","NETWORK SERVICE","-"),
+        i_IpAddrMalformed      = isnotempty(IpAddress)
+                                 and IpAddress !in ("-","::")
+                                 and not(IpAddress matches regex @"^(\d{1,3}\.){3}\d{1,3}$")
+                                 and not(IpAddress matches regex @"^[0-9a-fA-F:]{2,39}$"),
+        i_LogonTypeInvalid     = EventID in (4624,4625)
+                                 and isnotempty(tostring(LogonType))
+                                 and toint(LogonType) !in (ValidWindowsLogonTypes);
+let SE =
+    union
+    (SE_Base | summarize AffectedCount=countif(i_ComputerMissing), TotalRecords=count()
+      | extend TableName="SecurityEvent", FieldName="Computer", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="Computer should be populated on SecurityEvent records.",
+               Severity="High",
+               DrilldownQuery='SecurityEvent | where TimeGenerated > ago(24h) | where isempty(Computer) | project TimeGenerated, Computer, Account, EventID, IpAddress | take 100'),
+    (SE_Base | summarize AffectedCount=countif(i_AccountMissing), TotalRecords=count()
+      | extend TableName="SecurityEvent", FieldName="Account", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="Account is missing on records where account context is generally expected.",
+               Severity="High",
+               DrilldownQuery='SecurityEvent | where TimeGenerated > ago(24h) | where isempty(Account) | project TimeGenerated, Computer, Account, EventID, SubjectUserName, TargetUserName | take 100'),
+    (SE_Base | summarize AffectedCount=countif(i_EventIDMissing), TotalRecords=count()
+      | extend TableName="SecurityEvent", FieldName="EventID", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="EventID should be present on SecurityEvent records.",
+               Severity="High",
+               DrilldownQuery='SecurityEvent | where TimeGenerated > ago(24h) | where isnull(EventID) | project TimeGenerated, Computer, Account, EventID | take 100'),
+    (SE_Base | summarize AffectedCount=countif(i_SubjectUserMissing), TotalRecords=count()
+      | extend TableName="SecurityEvent", FieldName="SubjectUserName", CheckType="Null/Empty", IssueType="ContextMissing",
+               Reason="SubjectUserName is missing on event IDs where a subject identity is usually expected.",
+               Severity="Medium",
+               DrilldownQuery='SecurityEvent | where TimeGenerated > ago(24h) | where EventID in (4624,4625,4648,4672,4688) and isempty(SubjectUserName) | project TimeGenerated, Computer, Account, EventID, SubjectUserName, TargetUserName | take 100'),
+    (SE_Base | summarize AffectedCount=countif(i_TargetUserMissing), TotalRecords=count()
+      | extend TableName="SecurityEvent", FieldName="TargetUserName", CheckType="Null/Empty", IssueType="ContextMissing",
+               Reason="TargetUserName is missing on authentication events where a target user is usually expected.",
+               Severity="Medium",
+               DrilldownQuery='SecurityEvent | where TimeGenerated > ago(24h) | where EventID in (4624,4625,4648) and isempty(TargetUserName) | project TimeGenerated, Computer, Account, EventID, SubjectUserName, TargetUserName | take 100'),
+    (SE_Base | summarize AffectedCount=countif(i_EventIDRange), TotalRecords=count()
+      | extend TableName="SecurityEvent", FieldName="EventID", CheckType="InvalidRange", IssueType="PlausibilityFailure",
+               Reason="EventID falls outside the normal Windows event ID range.",
+               Severity="High",
+               DrilldownQuery='SecurityEvent | where TimeGenerated > ago(24h) | where isnotnull(EventID) and not(EventID between (0 .. 65535)) | project TimeGenerated, Computer, Account, EventID | take 100'),
+    (SE_Base | summarize AffectedCount=countif(i_AccountPlaceholder), TotalRecords=count()
+      | extend TableName="SecurityEvent", FieldName="Account", CheckType="Placeholder", IssueType="PlaceholderValue",
+               Reason="Account contains a placeholder or junk value rather than a real identity.",
+               Severity="Medium",
+               DrilldownQuery='SecurityEvent | where TimeGenerated > ago(24h) | where isnotempty(Account) and tolower(trim(@" ", tostring(Account))) in ("unknown","n/a","na","null","undefined","none","-","test") | project TimeGenerated, Computer, Account, EventID | take 100'),
+    (SE_Base | summarize AffectedCount=countif(i_AccountMalformed), TotalRecords=count()
+      | extend TableName="SecurityEvent", FieldName="Account", CheckType="InvalidFormat", IssueType="FormatAnomaly",
+               Reason="Account lacks common Windows account structure such as domain\\user or UPN.",
+               Severity="Medium",
+               DrilldownQuery='SecurityEvent | where TimeGenerated > ago(24h) | where isnotempty(Account) and not(Account contains "\\\\") and not(Account contains "@") and Account !in ("SYSTEM","LOCAL SERVICE","NETWORK SERVICE","-") | project TimeGenerated, Computer, Account, EventID | take 100'),
+    (SE_Base | summarize AffectedCount=countif(i_IpAddrMalformed), TotalRecords=count()
+      | extend TableName="SecurityEvent", FieldName="IpAddress", CheckType="InvalidFormat", IssueType="ParseFailure",
+               Reason="IpAddress is populated but does not look like valid IPv4 or IPv6.",
+               Severity="Medium",
+               // FIX: \\d and \\. are the escaped forms of \d and \. inside a single-quoted string
+               DrilldownQuery='SecurityEvent | where TimeGenerated > ago(24h) | where isnotempty(IpAddress) and IpAddress !in ("-","::") and not(IpAddress matches regex @"^(\\d{1,3}\\.){3}\\d{1,3}$") and not(IpAddress matches regex @"^[0-9a-fA-F:]{2,39}$") | project TimeGenerated, Computer, Account, EventID, IpAddress | take 100'),
+    (SE_Base | summarize AffectedCount=countif(i_LogonTypeInvalid), TotalRecords=count()
+      | extend TableName="SecurityEvent", FieldName="LogonType", CheckType="InvalidRange", IssueType="PlausibilityFailure",
+               Reason="LogonType is outside the normal set for 4624 and 4625 events.",
+               Severity="Medium",
+               DrilldownQuery='SecurityEvent | where TimeGenerated > ago(24h) | where EventID in (4624,4625) and isnotempty(tostring(LogonType)) and toint(LogonType) !in (2,3,4,5,7,8,9,10,11,12,13) | project TimeGenerated, Computer, Account, EventID, LogonType | take 100')
+    | where AffectedCount > 0;
+// =============================================================
+// 2) DeviceEvents
+// =============================================================
+let DE_Base =
+    DeviceEvents
+    | where TimeGenerated > ago(_time)
+    | extend
+        i_DeviceNameMissing        = isempty(DeviceName),
+        i_DeviceIdMissing          = isempty(DeviceId),
+        i_ActionTypeMissing        = isempty(ActionType),
+        i_AccountMissingContext    = isnotempty(InitiatingProcessFileName) and isempty(InitiatingProcessAccountName),
+        i_DeviceIdPlaceholder      = isnotempty(DeviceId) and tolower(trim(@" ", tostring(DeviceId))) in (PlaceholderValues),
+        i_DeviceIdTooShort         = isnotempty(DeviceId) and strlen(tostring(DeviceId)) < 8,
+        i_DeviceIdHasControlOrWS   = isnotempty(DeviceId) and DeviceId matches regex @"[\r\n\t]",
+        i_ReportIdMissing          = isnull(ReportId),
+        i_CommandWithoutProcess    = isnotempty(InitiatingProcessCommandLine) and isempty(InitiatingProcessFileName);
+let DE =
+    union
+    (DE_Base | summarize AffectedCount=countif(i_DeviceNameMissing), TotalRecords=count()
+      | extend TableName="DeviceEvents", FieldName="DeviceName", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="DeviceName should generally be populated on DeviceEvents.",
+               Severity="High",
+               DrilldownQuery='DeviceEvents | where TimeGenerated > ago(24h) | where isempty(DeviceName) | project TimeGenerated, DeviceName, DeviceId, ActionType, ReportId | take 100'),
+    (DE_Base | summarize AffectedCount=countif(i_DeviceIdMissing), TotalRecords=count()
+      | extend TableName="DeviceEvents", FieldName="DeviceId", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="DeviceId is missing entirely, which is more meaningful than enforcing a GUID format.",
+               Severity="High",
+               DrilldownQuery='DeviceEvents | where TimeGenerated > ago(24h) | where isempty(DeviceId) | project TimeGenerated, DeviceName, DeviceId, ActionType, ReportId | take 100'),
+    (DE_Base | summarize AffectedCount=countif(i_ActionTypeMissing), TotalRecords=count()
+      | extend TableName="DeviceEvents", FieldName="ActionType", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="ActionType should be present to describe the event.",
+               Severity="High",
+               DrilldownQuery='DeviceEvents | where TimeGenerated > ago(24h) | where isempty(ActionType) | project TimeGenerated, DeviceName, DeviceId, ActionType, ReportId | take 100'),
+    (DE_Base | summarize AffectedCount=countif(i_AccountMissingContext), TotalRecords=count()
+      | extend TableName="DeviceEvents", FieldName="InitiatingProcessAccountName", CheckType="Null/Empty", IssueType="ContextMissing",
+               Reason="InitiatingProcessAccountName is missing even though initiating process context exists.",
+               Severity="Medium",
+               DrilldownQuery='DeviceEvents | where TimeGenerated > ago(24h) | where isnotempty(InitiatingProcessFileName) and isempty(InitiatingProcessAccountName) | project TimeGenerated, DeviceName, DeviceId, ActionType, InitiatingProcessFileName, InitiatingProcessCommandLine, InitiatingProcessAccountName | take 100'),
+    (DE_Base | summarize AffectedCount=countif(i_DeviceIdPlaceholder), TotalRecords=count()
+      | extend TableName="DeviceEvents", FieldName="DeviceId", CheckType="Placeholder", IssueType="PlaceholderValue",
+               Reason="DeviceId contains a placeholder or junk string.",
+               Severity="Medium",
+               DrilldownQuery='DeviceEvents | where TimeGenerated > ago(24h) | where isnotempty(DeviceId) and tolower(trim(@" ", tostring(DeviceId))) in ("unknown","n/a","na","null","undefined","none","-","test") | project TimeGenerated, DeviceName, DeviceId, ActionType, ReportId | take 100'),
+    (DE_Base | summarize AffectedCount=countif(i_DeviceIdTooShort), TotalRecords=count()
+      | extend TableName="DeviceEvents", FieldName="DeviceId", CheckType="Suspicious", IssueType="PlausibilityFailure",
+               Reason="DeviceId is populated but implausibly short.",
+               Severity="Low",
+               DrilldownQuery='DeviceEvents | where TimeGenerated > ago(24h) | where isnotempty(DeviceId) and strlen(tostring(DeviceId)) < 8 | project TimeGenerated, DeviceName, DeviceId, ActionType, ReportId | take 100'),
+    (DE_Base | summarize AffectedCount=countif(i_DeviceIdHasControlOrWS), TotalRecords=count()
+      | extend TableName="DeviceEvents", FieldName="DeviceId", CheckType="InvalidFormat", IssueType="FormatAnomaly",
+               Reason="DeviceId contains control characters, tabs, or line breaks.",
+               Severity="Medium",
+               // FIX: \\r\\n\\t are the escaped forms of \r\n\t inside a single-quoted string
+               DrilldownQuery='DeviceEvents | where TimeGenerated > ago(24h) | where isnotempty(DeviceId) and DeviceId matches regex @"[\\r\\n\\t]" | project TimeGenerated, DeviceName, DeviceId, ActionType, ReportId | take 100'),
+    (DE_Base | summarize AffectedCount=countif(i_ReportIdMissing), TotalRecords=count()
+      | extend TableName="DeviceEvents", FieldName="ReportId", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="ReportId is missing and may indicate partial or broken event materialization.",
+               Severity="Medium",
+               DrilldownQuery='DeviceEvents | where TimeGenerated > ago(24h) | where isnull(ReportId) | project TimeGenerated, DeviceName, DeviceId, ActionType, ReportId | take 100'),
+    (DE_Base | summarize AffectedCount=countif(i_CommandWithoutProcess), TotalRecords=count()
+      | extend TableName="DeviceEvents", FieldName="InitiatingProcessFileName", CheckType="Inconsistent", IssueType="CrossFieldContradiction",
+               Reason="Command line exists but initiating process file name is missing.",
+               Severity="Medium",
+               DrilldownQuery='DeviceEvents | where TimeGenerated > ago(24h) | where isnotempty(InitiatingProcessCommandLine) and isempty(InitiatingProcessFileName) | project TimeGenerated, DeviceName, DeviceId, ActionType, InitiatingProcessFileName, InitiatingProcessCommandLine | take 100')
+    | where AffectedCount > 0;
+// =============================================================
+// 3) DeviceInfo
+// =============================================================
+let DI_Base =
+    DeviceInfo
+    | where TimeGenerated > ago(_time)
+    | extend
+        i_DeviceNameMissing      = isempty(DeviceName),
+        i_DeviceIdMissing        = isempty(DeviceId),
+        i_OSPlatformMissing      = isempty(OSPlatform),
+        i_OnboardStatusMissing   = isempty(OnboardingStatus),
+        i_PublicIPPlaceholder    = isnotempty(PublicIP) and PublicIP in ("-","::","0.0.0.0"),
+        i_PublicIPMalformed      = isnotempty(PublicIP)
+                                   and PublicIP !in ("-","::","0.0.0.0")
+                                   and not(PublicIP matches regex @"^(\d{1,3}\.){3}\d{1,3}$")
+                                   and not(PublicIP matches regex @"^[0-9a-fA-F:]{2,39}$"),
+        i_OSPlatformUnexpected   = isnotempty(OSPlatform) and OSPlatform !in (ValidOSPlatforms),
+        i_OnboardStatusUnexpected= isnotempty(OnboardingStatus) and OnboardingStatus !in (ValidOnboardingStatus),
+        i_DeviceIdPlaceholder    = isnotempty(DeviceId) and tolower(trim(@" ", tostring(DeviceId))) in (PlaceholderValues),
+        i_DeviceIdControlChars   = isnotempty(DeviceId) and DeviceId matches regex @"[\r\n\t]";
+let DI =
+    union
+    (DI_Base | summarize AffectedCount=countif(i_DeviceNameMissing), TotalRecords=count()
+      | extend TableName="DeviceInfo", FieldName="DeviceName", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="DeviceName should generally be populated on DeviceInfo records.",
+               Severity="High",
+               DrilldownQuery='DeviceInfo | where TimeGenerated > ago(24h) | where isempty(DeviceName) | project TimeGenerated, DeviceName, DeviceId, OSPlatform, PublicIP, OnboardingStatus | take 100'),
+    (DI_Base | summarize AffectedCount=countif(i_DeviceIdMissing), TotalRecords=count()
+      | extend TableName="DeviceInfo", FieldName="DeviceId", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="DeviceId is missing entirely.",
+               Severity="High",
+               DrilldownQuery='DeviceInfo | where TimeGenerated > ago(24h) | where isempty(DeviceId) | project TimeGenerated, DeviceName, DeviceId, OSPlatform, PublicIP, OnboardingStatus | take 100'),
+    (DI_Base | summarize AffectedCount=countif(i_OSPlatformMissing), TotalRecords=count()
+      | extend TableName="DeviceInfo", FieldName="OSPlatform", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="OSPlatform is missing from device inventory telemetry.",
+               Severity="Medium",
+               DrilldownQuery='DeviceInfo | where TimeGenerated > ago(24h) | where isempty(OSPlatform) | project TimeGenerated, DeviceName, DeviceId, OSPlatform, PublicIP, OnboardingStatus | take 100'),
+    (DI_Base | summarize AffectedCount=countif(i_OnboardStatusMissing), TotalRecords=count()
+      | extend TableName="DeviceInfo", FieldName="OnboardingStatus", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="OnboardingStatus is missing from DeviceInfo records.",
+               Severity="Medium",
+               DrilldownQuery='DeviceInfo | where TimeGenerated > ago(24h) | where isempty(OnboardingStatus) | project TimeGenerated, DeviceName, DeviceId, OSPlatform, PublicIP, OnboardingStatus | take 100'),
+    (DI_Base | summarize AffectedCount=countif(i_PublicIPPlaceholder), TotalRecords=count()
+      | extend TableName="DeviceInfo", FieldName="PublicIP", CheckType="Placeholder", IssueType="PlaceholderValue",
+               Reason="PublicIP contains a sentinel placeholder value.",
+               Severity="Low",
+               DrilldownQuery='DeviceInfo | where TimeGenerated > ago(24h) | where isnotempty(PublicIP) and PublicIP in ("-","::","0.0.0.0") | project TimeGenerated, DeviceName, DeviceId, OSPlatform, PublicIP, OnboardingStatus | take 100'),
+    (DI_Base | summarize AffectedCount=countif(i_PublicIPMalformed), TotalRecords=count()
+      | extend TableName="DeviceInfo", FieldName="PublicIP", CheckType="InvalidFormat", IssueType="ParseFailure",
+               Reason="PublicIP is populated but does not look like valid IPv4 or IPv6.",
+               Severity="Medium",
+               // FIX: \\d and \\. are the escaped forms of \d and \. inside a single-quoted string
+               DrilldownQuery='DeviceInfo | where TimeGenerated > ago(24h) | where isnotempty(PublicIP) and PublicIP !in ("-","::","0.0.0.0") and not(PublicIP matches regex @"^(\\d{1,3}\\.){3}\\d{1,3}$") and not(PublicIP matches regex @"^[0-9a-fA-F:]{2,39}$") | project TimeGenerated, DeviceName, DeviceId, OSPlatform, PublicIP, OnboardingStatus | take 100'),
+    (DI_Base | summarize AffectedCount=countif(i_OSPlatformUnexpected), TotalRecords=count()
+      | extend TableName="DeviceInfo", FieldName="OSPlatform", CheckType="InvalidFormat", IssueType="UnexpectedEnum",
+               Reason="OSPlatform is outside the expected platform set.",
+               Severity="Medium",
+               DrilldownQuery='DeviceInfo | where TimeGenerated > ago(24h) | where isnotempty(OSPlatform) and OSPlatform !in ("Windows","Linux","macOS","iOS","Android","Unknown","ChromeOS") | project TimeGenerated, DeviceName, DeviceId, OSPlatform, PublicIP, OnboardingStatus | take 100'),
+    (DI_Base | summarize AffectedCount=countif(i_OnboardStatusUnexpected), TotalRecords=count()
+      | extend TableName="DeviceInfo", FieldName="OnboardingStatus", CheckType="InvalidFormat", IssueType="UnexpectedEnum",
+               Reason="OnboardingStatus is outside the expected value set.",
+               Severity="Low",
+               DrilldownQuery='DeviceInfo | where TimeGenerated > ago(24h) | where isnotempty(OnboardingStatus) and OnboardingStatus !in ("Onboarded","CanBeOnboarded","Insufficient","InsufficientInfo","NoStatus","NotOnboarded") | project TimeGenerated, DeviceName, DeviceId, OSPlatform, PublicIP, OnboardingStatus | take 100'),
+    (DI_Base | summarize AffectedCount=countif(i_DeviceIdPlaceholder), TotalRecords=count()
+      | extend TableName="DeviceInfo", FieldName="DeviceId", CheckType="Placeholder", IssueType="PlaceholderValue",
+               Reason="DeviceId contains a placeholder or junk value.",
+               Severity="Medium",
+               DrilldownQuery='DeviceInfo | where TimeGenerated > ago(24h) | where isnotempty(DeviceId) and tolower(trim(@" ", tostring(DeviceId))) in ("unknown","n/a","na","null","undefined","none","-","test") | project TimeGenerated, DeviceName, DeviceId, OSPlatform, PublicIP, OnboardingStatus | take 100'),
+    (DI_Base | summarize AffectedCount=countif(i_DeviceIdControlChars), TotalRecords=count()
+      | extend TableName="DeviceInfo", FieldName="DeviceId", CheckType="InvalidFormat", IssueType="FormatAnomaly",
+               Reason="DeviceId contains control characters, tabs, or line breaks.",
+               Severity="Medium",
+               // FIX: \\r\\n\\t are the escaped forms of \r\n\t inside a single-quoted string
+               DrilldownQuery='DeviceInfo | where TimeGenerated > ago(24h) | where isnotempty(DeviceId) and DeviceId matches regex @"[\\r\\n\\t]" | project TimeGenerated, DeviceName, DeviceId, OSPlatform, PublicIP, OnboardingStatus | take 100')
+    | where AffectedCount > 0;
+// =============================================================
+// 4) CommonSecurityLog
+// =============================================================
+let CSL_Base =
+    CommonSecurityLog
+    | where TimeGenerated > ago(_time)
+    | extend
+        i_DeviceVendorMissing    = isempty(DeviceVendor),
+        i_DeviceProductMissing   = isempty(DeviceProduct),
+        i_ActivityMissing        = isempty(Activity),
+        i_SourceIPMissing        = isempty(SourceIP),
+        i_DestinationIPMissing   = isempty(DestinationIP),
+        i_SourceIPMalformed      = isnotempty(SourceIP)
+                                   and SourceIP !in ("-","::","0.0.0.0")
+                                   and not(SourceIP matches regex @"^(\d{1,3}\.){3}\d{1,3}$")
+                                   and not(SourceIP matches regex @"^[0-9a-fA-F:]{2,39}$"),
+        i_DestinationIPMalformed = isnotempty(DestinationIP)
+                                   and DestinationIP !in ("-","::","0.0.0.0")
+                                   and not(DestinationIP matches regex @"^(\d{1,3}\.){3}\d{1,3}$")
+                                   and not(DestinationIP matches regex @"^[0-9a-fA-F:]{2,39}$"),
+        i_SourcePortInvalid      = isnotempty(tostring(SourcePort)) and (SourcePort < 0 or SourcePort > 65535),
+        i_DestinationPortInvalid = isnotempty(tostring(DestinationPort)) and (DestinationPort < 0 or DestinationPort > 65535),
+        i_LogSeverityUnexpected  = isnotempty(LogSeverity)
+                                   and LogSeverity !in ("0","1","2","3","4","5","6","7","8","9","10","Unknown","Low","Medium","High","Very-High"),
+        i_NoSrcOrDst             = isempty(SourceIP) and isempty(DestinationIP);
+let CSL =
+    union
+    (CSL_Base | summarize AffectedCount=countif(i_DeviceVendorMissing), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="DeviceVendor", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="CEF telemetry should generally identify the sending vendor.",
+               Severity="High",
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isempty(DeviceVendor) | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, SourceIP, DestinationIP | take 100'),
+    (CSL_Base | summarize AffectedCount=countif(i_DeviceProductMissing), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="DeviceProduct", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="CEF telemetry should generally identify the sending product.",
+               Severity="High",
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isempty(DeviceProduct) | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, SourceIP, DestinationIP | take 100'),
+    (CSL_Base | summarize AffectedCount=countif(i_ActivityMissing), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="Activity", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="Activity is missing from a CEF event.",
+               Severity="High",
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isempty(Activity) | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, SourceIP, DestinationIP | take 100'),
+    (CSL_Base | summarize AffectedCount=countif(i_SourceIPMissing), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="SourceIP", CheckType="Null/Empty", IssueType="ContextMissing",
+               Reason="SourceIP is empty on a network-oriented log.",
+               Severity="Medium",
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isempty(SourceIP) | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, SourceIP, DestinationIP, SourcePort, DestinationPort | take 100'),
+    (CSL_Base | summarize AffectedCount=countif(i_DestinationIPMissing), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="DestinationIP", CheckType="Null/Empty", IssueType="ContextMissing",
+               Reason="DestinationIP is empty on a network-oriented log.",
+               Severity="Medium",
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isempty(DestinationIP) | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, SourceIP, DestinationIP, SourcePort, DestinationPort | take 100'),
+    (CSL_Base | summarize AffectedCount=countif(i_SourceIPMalformed), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="SourceIP", CheckType="InvalidFormat", IssueType="ParseFailure",
+               Reason="SourceIP is populated but does not look like valid IPv4 or IPv6.",
+               Severity="High",
+               // FIX: \\d and \\. are the escaped forms of \d and \. inside a single-quoted string
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isnotempty(SourceIP) and SourceIP !in ("-","::","0.0.0.0") and not(SourceIP matches regex @"^(\\d{1,3}\\.){3}\\d{1,3}$") and not(SourceIP matches regex @"^[0-9a-fA-F:]{2,39}$") | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, SourceIP, DestinationIP | take 100'),
+    (CSL_Base | summarize AffectedCount=countif(i_DestinationIPMalformed), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="DestinationIP", CheckType="InvalidFormat", IssueType="ParseFailure",
+               Reason="DestinationIP is populated but does not look like valid IPv4 or IPv6.",
+               Severity="High",
+               // FIX: \\d and \\. are the escaped forms of \d and \. inside a single-quoted string
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isnotempty(DestinationIP) and DestinationIP !in ("-","::","0.0.0.0") and not(DestinationIP matches regex @"^(\\d{1,3}\\.){3}\\d{1,3}$") and not(DestinationIP matches regex @"^[0-9a-fA-F:]{2,39}$") | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, SourceIP, DestinationIP | take 100'),
+    (CSL_Base | summarize AffectedCount=countif(i_SourcePortInvalid), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="SourcePort", CheckType="InvalidRange", IssueType="PlausibilityFailure",
+               Reason="SourcePort falls outside 0-65535.",
+               Severity="Medium",
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isnotempty(tostring(SourcePort)) and (SourcePort < 0 or SourcePort > 65535) | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, SourceIP, SourcePort | take 100'),
+    (CSL_Base | summarize AffectedCount=countif(i_DestinationPortInvalid), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="DestinationPort", CheckType="InvalidRange", IssueType="PlausibilityFailure",
+               Reason="DestinationPort falls outside 0-65535.",
+               Severity="Medium",
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isnotempty(tostring(DestinationPort)) and (DestinationPort < 0 or DestinationPort > 65535) | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, DestinationIP, DestinationPort | take 100'),
+    (CSL_Base | summarize AffectedCount=countif(i_LogSeverityUnexpected), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="LogSeverity", CheckType="InvalidFormat", IssueType="UnexpectedEnum",
+               Reason="LogSeverity is outside the expected CEF range or label set.",
+               Severity="Low",
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isnotempty(LogSeverity) and LogSeverity !in ("0","1","2","3","4","5","6","7","8","9","10","Unknown","Low","Medium","High","Very-High") | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, LogSeverity | take 100'),
+    (CSL_Base | summarize AffectedCount=countif(i_NoSrcOrDst), TotalRecords=count()
+      | extend TableName="CommonSecurityLog", FieldName="SourceIP/DestinationIP", CheckType="Inconsistent", IssueType="CrossFieldContradiction",
+               Reason="Both source and destination IP are missing on a log that looks network-oriented.",
+               Severity="Medium",
+               DrilldownQuery='CommonSecurityLog | where TimeGenerated > ago(24h) | where isempty(SourceIP) and isempty(DestinationIP) | project TimeGenerated, DeviceVendor, DeviceProduct, Activity, SourceIP, DestinationIP, Message | take 100')
+    | where AffectedCount > 0;
+// =============================================================
+// 5) Syslog
+// =============================================================
+let SL_Base =
+    Syslog
+    | where TimeGenerated > ago(_time)
+    | extend
+        i_ComputerMissing        = isempty(Computer),
+        i_MessageMissing         = isempty(SyslogMessage),
+        i_FacilityMissing        = isempty(Facility),
+        i_SeverityMissing        = isempty(SeverityLevel),
+        i_ProcessMissingContext  = isnotempty(SyslogMessage) and SyslogMessage has ":" and isempty(ProcessName),
+        i_FacilityUnexpected     = isnotempty(Facility) and Facility !in (ValidSyslogFacilities),
+        i_SeverityUnexpected     = isnotempty(SeverityLevel) and SeverityLevel !in (ValidSyslogSeverities),
+        i_MessageTooShort        = isnotempty(SyslogMessage) and strlen(SyslogMessage) < 5,
+        i_MessagePlaceholder     = isnotempty(SyslogMessage) and tolower(trim(@" ", tostring(SyslogMessage))) in (PlaceholderValues);
+let SL =
+    union
+    (SL_Base | summarize AffectedCount=countif(i_ComputerMissing), TotalRecords=count()
+      | extend TableName="Syslog", FieldName="Computer", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="Computer is missing on Syslog records.",
+               Severity="High",
+               DrilldownQuery='Syslog | where TimeGenerated > ago(24h) | where isempty(Computer) | project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage | take 100'),
+    (SL_Base | summarize AffectedCount=countif(i_MessageMissing), TotalRecords=count()
+      | extend TableName="Syslog", FieldName="SyslogMessage", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="SyslogMessage is empty.",
+               Severity="High",
+               DrilldownQuery='Syslog | where TimeGenerated > ago(24h) | where isempty(SyslogMessage) | project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage | take 100'),
+    (SL_Base | summarize AffectedCount=countif(i_FacilityMissing), TotalRecords=count()
+      | extend TableName="Syslog", FieldName="Facility", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="Facility is missing from syslog metadata.",
+               Severity="Medium",
+               DrilldownQuery='Syslog | where TimeGenerated > ago(24h) | where isempty(Facility) | project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage | take 100'),
+    (SL_Base | summarize AffectedCount=countif(i_SeverityMissing), TotalRecords=count()
+      | extend TableName="Syslog", FieldName="SeverityLevel", CheckType="Null/Empty", IssueType="RequiredFieldMissing",
+               Reason="SeverityLevel is missing from syslog metadata.",
+               Severity="Medium",
+               DrilldownQuery='Syslog | where TimeGenerated > ago(24h) | where isempty(SeverityLevel) | project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage | take 100'),
+    (SL_Base | summarize AffectedCount=countif(i_ProcessMissingContext), TotalRecords=count()
+      | extend TableName="Syslog", FieldName="ProcessName", CheckType="Null/Empty", IssueType="ContextMissing",
+               Reason="ProcessName is missing even though the syslog message appears process-structured.",
+               Severity="Low",
+               DrilldownQuery='Syslog | where TimeGenerated > ago(24h) | where isnotempty(SyslogMessage) and SyslogMessage has ":" and isempty(ProcessName) | project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage | take 100'),
+    (SL_Base | summarize AffectedCount=countif(i_FacilityUnexpected), TotalRecords=count()
+      | extend TableName="Syslog", FieldName="Facility", CheckType="InvalidFormat", IssueType="UnexpectedEnum",
+               Reason="Facility is outside the standard syslog facility set.",
+               Severity="Medium",
+               DrilldownQuery='Syslog | where TimeGenerated > ago(24h) | where isnotempty(Facility) and Facility !in ("kern","user","mail","daemon","auth","syslog","lpr","news","uucp","cron","authpriv","ftp","local0","local1","local2","local3","local4","local5","local6","local7") | project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage | take 100'),
+    (SL_Base | summarize AffectedCount=countif(i_SeverityUnexpected), TotalRecords=count()
+      | extend TableName="Syslog", FieldName="SeverityLevel", CheckType="InvalidFormat", IssueType="UnexpectedEnum",
+               Reason="SeverityLevel is outside the standard syslog severity set.",
+               Severity="Medium",
+               DrilldownQuery='Syslog | where TimeGenerated > ago(24h) | where isnotempty(SeverityLevel) and SeverityLevel !in ("emerg","alert","crit","err","warning","notice","info","debug") | project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage | take 100'),
+    (SL_Base | summarize AffectedCount=countif(i_MessageTooShort), TotalRecords=count()
+      | extend TableName="Syslog", FieldName="SyslogMessage", CheckType="Suspicious", IssueType="PlausibilityFailure",
+               Reason="SyslogMessage is suspiciously short and may be truncated.",
+               Severity="Low",
+               DrilldownQuery='Syslog | where TimeGenerated > ago(24h) | where isnotempty(SyslogMessage) and strlen(SyslogMessage) < 5 | project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage | take 100'),
+    (SL_Base | summarize AffectedCount=countif(i_MessagePlaceholder), TotalRecords=count()
+      | extend TableName="Syslog", FieldName="SyslogMessage", CheckType="Placeholder", IssueType="PlaceholderValue",
+               Reason="SyslogMessage contains a placeholder or junk value.",
+               Severity="Low",
+               DrilldownQuery='Syslog | where TimeGenerated > ago(24h) | where isnotempty(SyslogMessage) and tolower(trim(@" ", tostring(SyslogMessage))) in ("unknown","n/a","na","null","undefined","none","-","test") | project TimeGenerated, Computer, Facility, SeverityLevel, ProcessName, SyslogMessage | take 100')
+    | where AffectedCount > 0;
+// =============================================================
+// Final output
+// =============================================================
+union SE, DE, DI, CSL, SL
+| where TotalRecords > 0
+| extend AffectedPct = round(100.0 * todouble(AffectedCount) / todouble(TotalRecords), 2)
+| extend Status = case(
+    Severity == "High"   and AffectedPct > 1.0,  "🔴 Critical",
+    Severity == "High"   and AffectedPct > 0.0,  "🟠 Warning",
+    Severity == "Medium" and AffectedPct > 5.0,  "🔴 Critical",
+    Severity == "Medium" and AffectedPct > 0.0,  "🟠 Warning",
+    Severity == "Low"    and AffectedPct > 10.0, "🟠 Warning",
+                                                 "🟢 Info"
+)
+| project-reorder
+    Status, TableName, FieldName, CheckType, IssueType, Reason, Severity,
+    AffectedCount, TotalRecords, AffectedPct, DrilldownQuery
+| sort by
+    case(Status == "🔴 Critical", 0, Status == "🟠 Warning", 1, 2) asc,
+    TableName asc,
+    AffectedPct desc
