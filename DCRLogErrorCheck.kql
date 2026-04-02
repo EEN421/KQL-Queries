@@ -1,0 +1,4 @@
+DCRLogErrors
+| where TimeGenerated > ago(7d)
+| summarize count() by OperationName, InputStreamId
+| order by count_ desc
