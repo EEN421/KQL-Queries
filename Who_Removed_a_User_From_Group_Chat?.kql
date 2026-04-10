@@ -1,0 +1,16 @@
+// Author: Ian D. Hanley | LinkedIn: /in/ianhanley/ | Twitter: @IanDHanley | Github: https://github.com/EEN421 | Blog: Hanley.cloud / DevSecOpsDad.com
+//This is a targeted audit query for: “Show me all Teams-related removal actions performed by a specific user in the last 7 days.”
+
+OfficeActivity                             // Pull from Office 365 activity logs (Unified Audit Log)
+| where TimeGenerated > ago(7d)            // Scope to last 7 days → keeps query performant and relevant
+| where OfficeWorkload == "MicrosoftTeams" // Focus only on Microsoft Teams workload events
+| where Operation has_any ("MemberRemoved", "Removed") // Look for removal-type actions
+| where UserId == "first.last@domain.com" // Filter to a specific user (target of investigation)
+| project   // Select only the fields we care about for triage
+    TimeGenerated,   // When the action occurred
+    UserId,          // Who performed the action (important distinction)
+    Operation,       // Type of removal event
+    TeamName,        // Team context (if applicable)
+    ChannelName,     // Channel context (may be empty for chats)
+    Members          // Often contains the affected users (key field for investigation)
+| order by TimeGenerated desc // Show most recent events first for analyst workflow
